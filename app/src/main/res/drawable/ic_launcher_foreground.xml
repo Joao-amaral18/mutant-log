@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54">
+        <!-- Center Barbell Shaft -->
+        <path
+            android:fillColor="#E2E8F0"
+            android:pathData="M24,51 h60 v6 h-60 z" />
+        <!-- Inner Knurling / Collars -->
+        <path
+            android:fillColor="#94A3B8"
+            android:pathData="M34,48 h4 v12 h-4 z M70,48 h4 v12 h-4 z" />
+        <!-- Big Outer Plates Left -->
+        <path
+            android:fillColor="#CCFF00"
+            android:pathData="M28,34 h5 v40 h-5 z" />
+        <path
+            android:fillColor="#10B981"
+            android:pathData="M22,39 h4 v30 h-4 z" />
+        <path
+            android:fillColor="#64748B"
+            android:pathData="M17,44 h3 v20 h-3 z" />
+        <!-- Big Outer Plates Right -->
+        <path
+            android:fillColor="#CCFF00"
+            android:pathData="M75,34 h5 v40 h-5 z" />
+        <path
+            android:fillColor="#10B981"
+            android:pathData="M82,39 h4 v30 h-4 z" />
+        <path
+            android:fillColor="#64748B"
+            android:pathData="M88,44 h3 v20 h-3 z" />
+        <!-- Center Stylized Mutant M Badge / Core Icon -->
+        <path
+            android:fillColor="#CCFF00"
+            android:pathData="M42,42 L48,42 L54,52 L60,42 L66,42 L66,66 L60,66 L60,54 L55,62 L53,62 L48,54 L48,66 L42,66 Z" />
+        <!-- Tech Accent Dots -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,32 A2,2 0 1,0 54,36 A2,2 0 1,0 54,32 Z M54,72 A2,2 0 1,0 54,76 A2,2 0 1,0 54,72 Z" />
+    </group>
+</vector>

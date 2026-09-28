@@ -1,0 +1,6 @@
+{
+  "name": "Mutant Log",
+  "description": "Training Operating System for high-intensity protocols, double progression tracking, and fatigue readiness",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

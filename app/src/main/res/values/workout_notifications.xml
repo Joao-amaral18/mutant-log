@@ -1,0 +1,7 @@
+<resources>
+    <string name="notification_workout_active">Workout in progress</string>
+    <string name="notification_pause">Pause</string>
+    <string name="notification_resume">Resume</string>
+    <string name="notification_skip">Skip rest</string>
+    <string name="notification_finish">Finish</string>
+</resources>
