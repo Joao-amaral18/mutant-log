@@ -1,0 +1,303 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<title>Performance Gym Tracker</title>
+<!-- Tailwind CSS v3 CDN with forms and container queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts for High-Performance Industrial Typography -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&amp;family=Inter:wght@400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@500;700;800&amp;display=swap" rel="stylesheet">
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              black: '#0D0E11',
+              charcoal: '#14161A',
+              card: '#1A1D23',
+              cardBorder: '#272B33',
+              muted: '#656D7A',
+              borderLight: '#323742',
+              lime: '#D4FF32',
+              limeDark: '#B3DC1A',
+              crimson: '#FF334B',
+              coralSoft: 'rgba(255, 51, 75, 0.15)'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+            display: ['Chakra Petch', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-gym-styles">
+    /* High-contrast gym interface utilities */
+    body {
+      background-color: #0B0C0E;
+      color: #F1F4F9;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    
+    .tactile-button:active {
+      transform: scale(0.96);
+    }
+    
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Custom subtle scrollbar */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#0B0C0E] font-sans antialiased text-slate-100 flex justify-center selection:bg-brand-lime selection:text-black">
+<!-- Mobile iOS Frame Container -->
+<main class="w-full max-w-[430px] min-h-screen bg-brand-charcoal flex flex-col justify-between pb-8 pt-2 px-4 border-x border-[#20242B] shadow-2xl relative">
+<!-- BEGIN: TopStatusBarAndNav -->
+<header class="w-full pt-1 pb-3 flex flex-col gap-3">
+<!-- Top App Bar -->
+<div class="flex items-center justify-between">
+<!-- Back Navigation & Session Meta -->
+<div class="flex items-center gap-3">
+<button aria-label="Previous Exercise" class="w-10 h-10 rounded-xl bg-brand-card border border-brand-cardBorder flex items-center justify-center text-slate-300 hover:text-white hover:border-brand-muted tactile-button transition-all" type="button">
+<svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<div>
+<div class="flex items-center gap-2"><span class="inline-block w-2 h-2 rounded-full bg-[#A855F7] shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse"></span>
+<p class="text-[10px] font-mono tracking-widest text-[#C084FC] font-bold uppercase">PULL HYPERTROPHY</p></div>
+<h1 class="text-sm font-extrabold uppercase tracking-tight text-white">Exercise 1 of 3</h1>
+</div>
+</div>
+<!-- Finish Session CTA -->
+<button class="px-3.5 py-1.5 rounded-lg bg-zinc-800/80 border border-zinc-700/80 hover:border-brand-lime/50 text-[11px] font-mono font-bold tracking-wider uppercase text-zinc-300 hover:text-white transition-all tactile-button" type="button">
+          End Workout
+        </button>
+</div>
+<!-- Segmented Exercise Progress Indicator -->
+<div class="grid grid-cols-3 gap-1.5 pt-1"><div class="h-1.5 rounded-full bg-[#A855F7] shadow-[0_0_10px_rgba(168,85,247,0.7)]"></div>
+<div class="h-1.5 rounded-full bg-brand-cardBorder"></div>
+<div class="h-1.5 rounded-full bg-brand-cardBorder"></div></div>
+</header>
+<!-- END: TopStatusBarAndNav -->
+<!-- BEGIN: ExerciseHeaderAndBadges -->
+<section aria-labelledby="exercise-title" class="mt-1 flex flex-col gap-2.5">
+<div>
+<div class="flex items-baseline justify-between">
+<h2 class="text-2xl font-black tracking-tight text-white uppercase font-display leading-tight" id="exercise-title">
+            Neutral Lat Pulldown
+          </h2>
+</div>
+<p class="text-xs font-mono font-semibold tracking-wide text-brand-muted uppercase mt-0.5">Nautilus Pro Dual Pulley</p>
+</div>
+<!-- Technical Rig Setup Chips -->
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#191D24] border border-[#2B303B] text-[11px] font-mono text-zinc-300">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+<span class="">Seat Pad: <b class="text-white font-bold">#3 Lock</b></span>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#191D24] border border-[#2B303B] text-[11px] font-mono text-zinc-300"><span class="w-1.5 h-1.5 rounded-full bg-[#A855F7] shadow-[0_0_6px_rgba(168,85,247,0.8)]"></span>
+<span class="">MAG Grip Close</span></div>
+<button aria-label="Gym Notes" class="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-brand-muted hover:text-white transition-colors" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+          Notes
+        </button>
+</div>
+<!-- Target Spec Banner -->
+<div class="p-3 rounded-xl bg-gradient-to-r from-zinc-900 via-[#181B21] to-zinc-900 border border-brand-cardBorder flex items-center justify-between"><div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-[#A855F7]/15 border border-[#A855F7]/40 flex items-center justify-center text-[#C084FC] shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+<path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div>
+<span class="text-[9px] uppercase tracking-wider font-mono font-bold text-zinc-400 block">Prescribed Target</span>
+<span class="text-xs font-mono font-extrabold text-white tracking-tight">2 SETS × 10–12 REPS @ 0 RIR</span>
+</div>
+</div>
+<div class="text-right border-l border-zinc-800 pl-3">
+<span class="text-[9px] uppercase tracking-wider font-mono font-semibold text-zinc-400 block">Baseline</span>
+<span class="text-xs font-mono font-black text-[#C084FC] tracking-tight">60.0 KG</span>
+</div></div>
+</section>
+<!-- END: ExerciseHeaderAndBadges -->
+<!-- BEGIN: ActiveSetLoggingCard -->
+<section class="mt-3 bg-brand-card rounded-2xl p-4 border border-brand-cardBorder relative shadow-lg flex flex-col gap-4">
+<!-- Module Header: Set ID & Set-Type Pill Switcher -->
+<div class="flex items-center justify-between border-b border-zinc-800/80 pb-3"><div class="flex items-center gap-2">
+<div class="w-2.5 h-2.5 bg-[#A855F7] shadow-[0_0_8px_rgba(168,85,247,0.8)] rotate-45"></div>
+<span class="text-xs font-mono font-bold tracking-widest uppercase text-white">SET 01 OF 02</span>
+</div>
+<!-- Segmented Control: Warmup vs Work Set -->
+<div aria-label="Set Type" class="flex p-0.5 bg-zinc-950 rounded-lg border border-zinc-800" role="group">
+<button class="px-2.5 py-1 text-[11px] font-mono uppercase font-bold text-zinc-500 hover:text-zinc-300 rounded-md transition-all" type="button">
+            Warm-up
+          </button>
+<button class="px-3 py-1 text-[11px] font-mono uppercase font-bold bg-[#A855F7] text-white shadow-[0_0_12px_rgba(168,85,247,0.5)] rounded-md transition-all" type="button">
+            Work Set
+          </button>
+</div></div>
+<!-- Precision Dual Inputs: Weight & Reps -->
+<div class="grid grid-cols-2 gap-3">
+<!-- Weight Stepper Column -->
+<div class="flex flex-col bg-zinc-950/80 p-3 rounded-xl border border-zinc-800/90">
+<div class="flex items-center justify-between text-zinc-400 mb-1">
+<span class="text-[10px] font-mono uppercase font-bold tracking-wider">LOAD</span>
+<span class="text-[10px] font-mono font-bold text-[#C084FC]">KG</span>
+</div>
+<!-- Main Metric Readout & Steppers -->
+<div class="flex items-center justify-between py-1">
+<span class="text-3xl font-black font-mono tracking-tighter text-white tabular-nums">60.0</span>
+<div class="flex items-center gap-1">
+
+
+</div>
+</div>
+<!-- Quick Jump Increments -->
+<div class="grid grid-cols-4 gap-1 mt-2 pt-2 border-t border-zinc-850">
+<button class="py-1 text-[10px] font-mono font-bold rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 tactile-button" type="button">-5</button>
+<button class="py-1 text-[10px] font-mono font-bold rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 tactile-button" type="button">-2.5</button>
+<button class="py-1 text-[10px] font-mono font-bold rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 tactile-button" type="button">+2.5</button>
+<button class="py-1 text-[10px] font-mono font-bold rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 tactile-button" type="button">+5</button>
+</div>
+</div>
+<!-- Reps Stepper Column -->
+<div class="flex flex-col bg-zinc-950/80 p-3 rounded-xl border border-zinc-800/90">
+<div class="flex items-center justify-between text-zinc-400 mb-1">
+<span class="text-[10px] font-mono uppercase font-bold tracking-wider">REPS</span>
+<span class="text-[10px] font-mono font-bold text-zinc-500">COUNT</span>
+</div>
+<!-- Main Reps Readout & Steppers -->
+<div class="flex items-center justify-between py-1">
+<span class="text-3xl font-black font-mono tracking-tighter text-white tabular-nums">10</span>
+<div class="flex items-center gap-1">
+
+
+</div>
+</div>
+<!-- Quick Jump Increments -->
+<div class="grid grid-cols-4 gap-1 mt-2 pt-2 border-t border-zinc-850">
+<button class="py-1 text-[10px] font-mono font-bold rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 tactile-button" type="button">-2</button>
+<button class="py-1 text-[10px] font-mono font-bold rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 tactile-button" type="button">-1</button>
+<button class="py-1 text-[10px] font-mono font-bold rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 tactile-button" type="button">+1</button>
+<button class="py-1 text-[10px] font-mono font-bold rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 tactile-button" type="button">+2</button>
+</div>
+</div>
+</div>
+<!-- Plate Loading Assistant Line -->
+<div class="flex items-center justify-between px-3 py-2 rounded-lg bg-[#111317] border border-dashed border-zinc-800"><div class="flex items-center gap-2">
+<span class="text-[10px] font-mono uppercase text-zinc-400 font-semibold tracking-wider">Plate Loading (Pin/Side):</span>
+<span class="text-xs font-mono font-bold text-white tracking-wide">20.0 KG / Side</span>
+</div>
+<!-- Barbell graphic badge -->
+<div class="flex items-center gap-0.5">
+<div class="w-1.5 h-4 bg-zinc-600 rounded-sm"></div>
+<div class="w-1.5 h-6 bg-[#A855F7] rounded-sm shadow-[0_0_6px_rgba(168,85,247,0.6)]"></div>
+<div class="w-4 h-1 bg-zinc-400"></div>
+<div class="w-1.5 h-6 bg-[#A855F7] rounded-sm shadow-[0_0_6px_rgba(168,85,247,0.6)]"></div>
+<div class="w-1.5 h-4 bg-zinc-600 rounded-sm"></div>
+</div></div>
+<!-- RIR (Reps in Reserve) Selector -->
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="text-[10px] font-mono uppercase font-bold text-zinc-400 tracking-wider">
+            RIR (REPS IN RESERVE)
+          </label>
+<span class="text-[9px] font-mono text-zinc-500 uppercase">0 = Absolute Failure</span>
+</div>
+<div class="grid grid-cols-5 gap-1.5">
+<!-- 0 RIR Failure State (Highlighted with Brutalist Danger Style) -->
+<button class="py-2 rounded-lg bg-brand-crimson text-white font-mono font-extrabold flex flex-col items-center justify-center border border-red-500 shadow-[0_0_10px_rgba(255,51,75,0.35)] tactile-button" type="button">
+<span class="text-sm leading-none">0</span>
+<span class="text-[8px] uppercase tracking-wider font-bold mt-0.5">FAILURE</span>
+</button>
+<!-- 1 RIR -->
+<button class="py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-600 font-mono font-extrabold text-sm flex items-center justify-center tactile-button" type="button">
+            1
+          </button>
+<!-- 2 RIR -->
+<button class="py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-600 font-mono font-extrabold text-sm flex items-center justify-center tactile-button" type="button">
+            2
+          </button>
+<!-- 3 RIR -->
+<button class="py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-600 font-mono font-extrabold text-sm flex items-center justify-center tactile-button" type="button">
+            3
+          </button>
+<!-- 4+ RIR -->
+<button class="py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-600 font-mono font-extrabold text-sm flex items-center justify-center tactile-button" type="button">
+            4+
+          </button>
+</div>
+</div>
+<!-- Execution Technique / Modifiers -->
+<div>
+<label class="text-[10px] font-mono uppercase font-bold text-zinc-400 tracking-wider block mb-1.5">
+          Intensity Modifiers
+        </label>
+<div class="grid grid-cols-4 gap-1.5">
+<button class="py-1.5 rounded-lg bg-[#272B33] border-2 border-[#A855F7] text-[#C084FC] shadow-[0_0_10px_rgba(168,85,247,0.25)] text-[11px] font-mono font-bold uppercase tactile-button" type="button">
+            Standard
+          </button>
+<button class="py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-[11px] font-mono font-semibold uppercase tactile-button" type="button">
+            Rest-Pause
+          </button>
+<button class="py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-[11px] font-mono font-semibold uppercase tactile-button" type="button">
+            Drop Set
+          </button>
+<button class="py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-[11px] font-mono font-semibold uppercase tactile-button" type="button">
+            Partials
+          </button>
+</div>
+</div>
+<!-- Master Action CTA: Confirm & Log Set -->
+<button class="w-full mt-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#9333EA] via-[#A855F7] to-[#7C3AED] hover:brightness-110 text-white font-extrabold text-sm font-mono tracking-wider uppercase flex items-center justify-center gap-2 shadow-[0_4px_24px_rgba(168,85,247,0.45)] border border-[#C084FC]/30 tactile-button transition-all" type="button">
+<svg class="w-5 h-5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="">Confirm &amp; Log Set</span>
+</button>
+</section>
+<!-- END: ActiveSetLoggingCard -->
+<!-- BEGIN: WorkoutFooterAndQueue -->
+<footer class="mt-4 flex flex-col gap-2.5">
+<!-- Next Exercise Quick Card -->
+<div class="p-3 bg-zinc-900/90 rounded-xl border border-zinc-800 flex items-center justify-between cursor-pointer hover:border-zinc-700 transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 font-mono text-xs font-bold">
+            02
+          </div>
+<div>
+<span class="text-[9px] font-mono uppercase text-[#C084FC] font-bold tracking-wider">UP NEXT</span>
+<p class="text-xs font-extrabold text-white tracking-wide uppercase">T-Bar Chest Supported Row</p>
+</div>
+</div>
+<div class="text-zinc-400">
+<svg class="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+<!-- Destructive Discard Session CTA -->
+<button class="py-2.5 text-[11px] font-mono tracking-wider uppercase font-bold text-zinc-500 hover:text-brand-crimson transition-colors flex items-center justify-center gap-2 tactile-button" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+        Discard Workout Session
+      </button>
+</footer>
+<!-- END: WorkoutFooterAndQueue -->
+</main>
+
+
+</body></html>

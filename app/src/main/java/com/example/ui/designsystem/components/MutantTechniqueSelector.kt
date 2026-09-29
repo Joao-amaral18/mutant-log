@@ -1,93 +1,59 @@
 package com.example.ui.designsystem.components
 
-import com.example.ui.designsystem.MutantTracking
-
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.model.IntensityTechnique
-import com.example.ui.designsystem.MutantColors
-import com.example.ui.designsystem.MutantMotion
 import com.example.ui.designsystem.MutantShapeTokens
 import com.example.ui.designsystem.MutantSpacing
+import com.example.ui.designsystem.WorkoutLoggerTokens
 
 @Composable
 fun MutantTechniqueSelector(
     selectedTechnique: IntensityTechnique,
     onTechniqueSelected: (IntensityTechnique) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
+    val colors = MaterialTheme.colorScheme
     val techniques = listOf(
-        IntensityTechnique.NONE to "None",
-        IntensityTechnique.REST_PAUSE to "Rest-pause",
-        IntensityTechnique.DROP_SET to "Drop",
-        IntensityTechnique.PARTIAL_REPS to "Partials"
+        IntensityTechnique.NONE to "STANDARD", IntensityTechnique.REST_PAUSE to "REST-PAUSE",
+        IntensityTechnique.DROP_SET to "DROP SET", IntensityTechnique.PARTIAL_REPS to "PARTIALS"
     )
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(MutantSpacing.xs)
-    ) {
-        Text(
-            text = "INTENSITY TECHNIQUE",
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.Bold,
-                color = MutantColors.TextMetadata,
-                letterSpacing = MutantTracking.Compact
-            )
-        )
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(MutantSpacing.xs)
-        ) {
-            techniques.forEach { (tech, label) ->
-                val isSelected = selectedTechnique == tech
-
-                val backgroundColor by animateColorAsState(
-                    targetValue = if (isSelected) MutantColors.PrimaryContainer else MutantColors.SurfaceContainerLow,
-                    animationSpec = tween(MutantMotion.Feedback),
-                    label = "TechBg"
-                )
-                val textColor by animateColorAsState(
-                    targetValue = if (isSelected) MutantColors.OnPrimaryContainer else MutantColors.TextSecondary,
-                    animationSpec = tween(MutantMotion.Feedback),
-                    label = "TechText"
-                )
-
-                Box(
-                    modifier = Modifier
-                        .height(36.dp)
-                        .clip(MutantShapeTokens.TinyControl)
-                        .background(backgroundColor)
-                        .clickable { onTechniqueSelected(tech) }
-                        .padding(horizontal = MutantSpacing.mdPlus)
-                        .testTag("tech_option_${tech.name.lowercase()}"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = textColor
-                        )
-                    )
+    Column(modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(MutantSpacing.xs)) {
+        Text("INTENSITY MODIFIERS", style = WorkoutLoggerTokens.Label, color = colors.onSurfaceVariant)
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val columns = if (maxWidth < 300.dp || androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.2f) 2 else 4
+            Column(verticalArrangement = Arrangement.spacedBy(MutantSpacing.compact)) {
+                techniques.chunked(columns).forEach { pair ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MutantSpacing.compact)) {
+                        pair.forEach { (technique, label) ->
+                            val selected = selectedTechnique == technique
+                            Surface(
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                                    .selectable(selected = selected, enabled = enabled, role = Role.RadioButton,
+                                        onClick = { onTechniqueSelected(technique) })
+                                    .testTag("technique_${technique.name}"),
+                                shape = MutantShapeTokens.TinyControl,
+                                color = if (selected) colors.primaryContainer else colors.surfaceContainerLow,
+                                border = BorderStroke(if (selected) 2.dp else 1.dp,
+                                    if (selected) colors.secondary else colors.outlineVariant)
+                            ) {
+                                Box(Modifier.padding(MutantSpacing.xxs), contentAlignment = Alignment.Center) {
+                                    Text(label, style = WorkoutLoggerTokens.Label,
+                                        color = if (selected) colors.secondary else colors.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

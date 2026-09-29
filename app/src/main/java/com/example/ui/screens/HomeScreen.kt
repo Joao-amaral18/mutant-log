@@ -51,6 +51,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val isStarting by viewModel.isStartingWorkout.collectAsState()
+    val isAdoptingTemplate by viewModel.isAdoptingTemplate.collectAsState()
     val startError by viewModel.startWorkoutError.collectAsState()
     val systemStatus by viewModel.systemStatus.collectAsState()
     val programDays by viewModel.programDays.collectAsState(initial = emptyList())
@@ -263,6 +264,7 @@ fun HomeScreen(
 
                         OutlinedButton(
                             onClick = { viewModel.adoptNickWalkerTemplate() },
+                            enabled = !isAdoptingTemplate,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp)
@@ -271,9 +273,19 @@ fun HomeScreen(
                             border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantVolt.copy(alpha = 0.6f)),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MutantVolt)
                         ) {
-                            Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(MutantSpacing.xs))
-                            Text("USE NICK WALKER TEMPLATE", fontWeight = FontWeight.Bold)
+                            if (isAdoptingTemplate) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MutantVolt
+                                )
+                                Spacer(modifier = Modifier.width(MutantSpacing.xs))
+                                Text("CARREGANDO TEMPLATE...", fontWeight = FontWeight.Bold)
+                            } else {
+                                Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(MutantSpacing.xs))
+                                Text("USE NICK WALKER TEMPLATE", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

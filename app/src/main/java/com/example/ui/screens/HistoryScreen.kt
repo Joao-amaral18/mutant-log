@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -33,6 +34,12 @@ fun HistoryScreen(viewModel: MutantViewModel, onNavigateBack: () -> Unit) {
     HistoryContent(state, onNavigateBack, viewModel::reloadHistory, viewModel::editWorkout, editError, editing)
 }
 
+private sealed interface HistoryView {
+    data object Main : HistoryView
+    data class Session(val workout: HistoryWorkout) : HistoryView
+    data class Exercise(val summary: HistoryExerciseSummary) : HistoryView
+}
+
 @Composable
 internal fun HistoryContent(
     state: HistoryUiState,
@@ -51,29 +58,96 @@ internal fun HistoryContent(
     BackHandler(sessionId != null || exerciseId != null) {
         if (sessionId != null) sessionId = null else exerciseId = null
     }
+    val currentView = when {
+        selectedSession != null -> HistoryView.Session(selectedSession)
+        selectedExercise != null -> HistoryView.Exercise(selectedExercise)
+        else -> HistoryView.Main
+    }
+
     Surface(modifier = Modifier.fillMaxSize(), color = MutantColors.Background, contentColor = MutantColors.TextPrimary) {
-    when {
-        selectedSession != null -> HistorySessionDetail(selectedSession, state.workouts, { sessionId = null }, onEdit, editError, editing)
-        selectedExercise != null -> HistoryExerciseDetail(selectedExercise, { exerciseId = null }, { sessionId = it })
-        else -> Column(Modifier.fillMaxSize().testTag("history_screen")) {
-            HistoryHeader("Histórico", onNavigateBack)
-            TabRow(selectedTabIndex = mode) {
-                listOf("Treinos", "Exercícios", "Calendário").forEachIndexed { index, title ->
-                    Tab(selected = mode == index, onClick = { mode = index }, text = { Text(title) }, modifier = Modifier.testTag("history_tab_$index"))
+        androidx.compose.animation.AnimatedContent(
+            targetState = currentView,
+            transitionSpec = {
+                val isBack = (initialState is HistoryView.Session && targetState is HistoryView.Exercise) ||
+                        (targetState is HistoryView.Main)
+                if (isBack) {
+                    (androidx.compose.animation.slideInHorizontally(
+                        initialOffsetX = { -it / 4 },
+                        animationSpec = androidx.compose.animation.core.tween(MutantMotion.Navigation)
+                    ) + androidx.compose.animation.fadeIn(
+                        animationSpec = androidx.compose.animation.core.tween(MutantMotion.Navigation)
+                    )) togetherWith (androidx.compose.animation.slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = androidx.compose.animation.core.tween(MutantMotion.Navigation)
+                    ) + androidx.compose.animation.fadeOut(
+                        animationSpec = androidx.compose.animation.core.tween(120)
+                    ))
+                } else {
+                    (androidx.compose.animation.slideInHorizontally(
+                        initialOffsetX = { it },
+                        animationSpec = androidx.compose.animation.core.tween(MutantMotion.Navigation)
+                    ) + androidx.compose.animation.fadeIn(
+                        animationSpec = androidx.compose.animation.core.tween(MutantMotion.Navigation)
+                    )) togetherWith (androidx.compose.animation.slideOutHorizontally(
+                        targetOffsetX = { -it / 4 },
+                        animationSpec = androidx.compose.animation.core.tween(MutantMotion.Navigation)
+                    ) + androidx.compose.animation.fadeOut(
+                        animationSpec = androidx.compose.animation.core.tween(120)
+                    ))
                 }
-            }
-            when {
-                state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                state.error != null -> Column(Modifier.padding(MutantSpacing.lg)) {
-                    Text(state.error, color = MutantColors.Error)
-                    TextButton(onClick = onRetry) { Text("Tentar novamente") }
+            },
+            label = "HistoryViewTransition"
+        ) { view ->
+            when (view) {
+                is HistoryView.Session -> HistorySessionDetail(
+                    workout = view.workout,
+                    all = state.workouts,
+                    onBack = { sessionId = null },
+                    onEdit = onEdit,
+                    editError = editError,
+                    editing = editing
+                )
+                is HistoryView.Exercise -> HistoryExerciseDetail(
+                    summary = view.summary,
+                    onBack = { exerciseId = null },
+                    onSession = { sessionId = it }
+                )
+                is HistoryView.Main -> Column(Modifier.fillMaxSize().testTag("history_screen")) {
+                    HistoryHeader("Histórico", onNavigateBack)
+                    TabRow(selectedTabIndex = mode) {
+                        listOf("Treinos", "Exercícios", "Calendário").forEachIndexed { index, title ->
+                            Tab(
+                                selected = mode == index,
+                                onClick = { mode = index },
+                                text = { Text(title) },
+                                modifier = Modifier.testTag("history_tab_$index")
+                            )
+                        }
+                    }
+                    when {
+                        state.loading -> com.example.ui.designsystem.components.MutantLoadingScreen(
+                            message = "Carregando histórico de treinos...",
+                            modifier = Modifier.fillMaxSize().testTag("history_loading")
+                        )
+                        state.error != null -> Column(Modifier.padding(MutantSpacing.lg)) {
+                            Text(state.error, color = MutantColors.Error)
+                            TextButton(onClick = onRetry) { Text("Tentar novamente") }
+                        }
+                        else -> androidx.compose.animation.AnimatedContent(
+                            targetState = mode,
+                            transitionSpec = { MutantMotion.ScreenFadeThroughSpec },
+                            label = "HistoryTabTransition"
+                        ) { currentMode ->
+                            when (currentMode) {
+                                0 -> HistoryTimeline(state.workouts) { sessionId = it }
+                                1 -> HistoryExerciseList(summaries) { exerciseId = it }
+                                else -> HistoryCalendar(state.workouts) { sessionId = it }
+                            }
+                        }
+                    }
                 }
-                mode == 0 -> HistoryTimeline(state.workouts) { sessionId = it }
-                mode == 1 -> HistoryExerciseList(summaries) { exerciseId = it }
-                else -> HistoryCalendar(state.workouts) { sessionId = it }
             }
         }
-    }
     }
 }
 

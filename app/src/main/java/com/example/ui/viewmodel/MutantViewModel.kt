@@ -311,10 +311,21 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // --- PROGRAM WORKFLOWS ---
-    fun adoptNickWalkerTemplate() {
+    private val _isAdoptingTemplate = MutableStateFlow(false)
+    val isAdoptingTemplate = _isAdoptingTemplate.asStateFlow()
+
+    fun adoptNickWalkerTemplate(onDone: () -> Unit = {}) {
+        if (!_isAdoptingTemplate.compareAndSet(false, true)) return
         viewModelScope.launch {
-            repository.adoptNickWalkerTemplate()
-            refreshLibraryCounts()
+            try {
+                repository.adoptNickWalkerTemplate()
+                refreshLibraryCounts()
+                onDone()
+            } catch (e: CancellationException) {
+                throw e
+            } finally {
+                _isAdoptingTemplate.value = false
+            }
         }
     }
 
@@ -415,12 +426,25 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
     fun requestFinishWorkout() { _finishRequested.value = true }
     fun consumeFinishRequest() { _finishRequested.value = false }
 
-    fun finishWorkout(notes: String, bodyweight: Float) {
+    private val _isFinishingWorkout = MutableStateFlow(false)
+    val isFinishingWorkout = _isFinishingWorkout.asStateFlow()
+
+    fun finishWorkout(notes: String, bodyweight: Float, onFinished: () -> Unit = {}) {
         val session = _activeWorkoutUiState.value.session ?: return
-        launchWorkoutMutation {
-            repository.finishWorkout(session.id, notes, bodyweight)
-            stopRestTimer()
-            refreshLibraryCounts()
+        if (!_isFinishingWorkout.compareAndSet(false, true)) return
+        viewModelScope.launch {
+            try {
+                workoutMutationMutex.withLock {
+                    repository.finishWorkout(session.id, notes, bodyweight)
+                    stopRestTimer()
+                    refreshLibraryCounts()
+                }
+                onFinished()
+            } catch (e: CancellationException) {
+                throw e
+            } finally {
+                _isFinishingWorkout.value = false
+            }
         }
     }
 

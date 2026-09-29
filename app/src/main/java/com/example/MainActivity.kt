@@ -42,7 +42,6 @@ enum class NavDestination(
     HOME("Protocol", Icons.Default.CalendarToday, "nav_home"),
     WORKOUT("Session", Icons.Default.FitnessCenter, "nav_workout"),
     HISTORY("Histórico", Icons.Default.History, "nav_dossier"),
-    VOLUME("Volume", Icons.Default.BarChart, "nav_volume"),
     CARDIO("Cardio", Icons.Default.DirectionsRun, "nav_cardio")
 }
 
@@ -206,13 +205,10 @@ fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableShar
                     )
                     NavDestination.WORKOUT -> ActiveWorkoutScreen(
                         viewModel = viewModel,
-                        onNavigateBack = { currentScreen = NavDestination.HOME }
+                        onNavigateBack = { currentScreen = NavDestination.HOME },
+                        onNavigateToHistory = { currentScreen = NavDestination.HISTORY }
                     )
                     NavDestination.HISTORY -> HistoryScreen(
-                        viewModel = viewModel,
-                        onNavigateBack = { currentScreen = NavDestination.HOME }
-                    )
-                    NavDestination.VOLUME -> VolumeAnalyticsScreen(
                         viewModel = viewModel,
                         onNavigateBack = { currentScreen = NavDestination.HOME }
                     )
@@ -224,7 +220,37 @@ fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableShar
             }
         }
     }
-    if (draft != null) {
+    val isStartingWorkout by viewModel.isStartingWorkout.collectAsState()
+    val isLoadingWorkout by viewModel.isLoadingWorkout.collectAsState()
+
+    androidx.compose.animation.AnimatedVisibility(
+        visible = draft != null,
+        enter = androidx.compose.animation.slideInVertically(
+            initialOffsetY = { it },
+            animationSpec = androidx.compose.animation.core.tween(MutantMotion.Container, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+        ) + androidx.compose.animation.fadeIn(
+            animationSpec = androidx.compose.animation.core.tween(MutantMotion.Navigation, easing = androidx.compose.animation.core.LinearOutSlowInEasing)
+        ),
+        exit = androidx.compose.animation.slideOutVertically(
+            targetOffsetY = { it },
+            animationSpec = androidx.compose.animation.core.tween(MutantMotion.State, easing = androidx.compose.animation.core.FastOutLinearInEasing)
+        ) + androidx.compose.animation.fadeOut(
+            animationSpec = androidx.compose.animation.core.tween(MutantMotion.Feedback, easing = androidx.compose.animation.core.FastOutLinearInEasing)
+        )
+    ) {
         CompletedWorkoutEditor(viewModel)
     }
+
+    com.example.ui.designsystem.components.MutantLoadingOverlay(
+        visible = isStartingWorkout,
+        message = "Iniciando sessão de treino...",
+        subMessage = "Configurando exercícios e séries...",
+        testTag = "starting_workout_overlay"
+    )
+
+    com.example.ui.designsystem.components.MutantLoadingOverlay(
+        visible = isLoadingWorkout,
+        message = "Carregando treino para edição...",
+        testTag = "loading_workout_overlay"
+    )
 }
