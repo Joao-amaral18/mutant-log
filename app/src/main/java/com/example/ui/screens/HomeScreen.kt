@@ -73,7 +73,8 @@ fun HomeScreen(
     var targetProgramDayId by remember { mutableStateOf<Long?>(null) }
     var selectedExerciseForVariant by remember { mutableStateOf<Exercise?>(null) }
 
-    val todayProgramDay = programDays.find { it.dayCode == "SEG" } ?: programDays.firstOrNull { !it.isRestDay }
+    val recommendedProgramDay = programDays.find { it.id == systemStatus.recommendedProgramDayId }
+        ?: programDays.firstOrNull { !it.isRestDay }
 
     if (showSettingsDialog) {
         SettingsDataDialog(
@@ -278,9 +279,8 @@ fun HomeScreen(
                 }
             }
         } else {
-            // Today's training focus
+            // Next workout, derived from completed routine history before weekday.
             item {
-                val isRestDay = todayProgramDay?.isRestDay == true
                 val statusColor = if (systemStatus.fatigueStatus == "Normal") MutantEmerald else MutantAmber
                 Card(
                     modifier = Modifier
@@ -318,7 +318,7 @@ fun HomeScreen(
                             verticalArrangement = Arrangement.spacedBy(MutantSpacing.xs)
                         ) {
                             Text(
-                                text = "TODAY",
+                                text = "PRÓXIMO TREINO",
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = MutantTextSecondary,
@@ -335,32 +335,32 @@ fun HomeScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier.size(9.dp).clip(CircleShape).background(
-                                        if (isRestDay) MutantTextMuted else statusColor
+                                        statusColor
                                     )
                                 )
                                 Spacer(modifier = Modifier.width(MutantSpacing.xs))
                                 Text(
-                                    text = when {
-                                        isRestDay -> "Rest day"
-                                        systemStatus.fatigueStatus == "Normal" -> "Ready"
-                                        else -> systemStatus.fatigueStatus
+                                    text = if (systemStatus.fatigueStatus == "Normal") {
+                                        "${systemStatus.todayDayCode} · sequência da rotina"
+                                    } else {
+                                        systemStatus.fatigueStatus
                                     },
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontWeight = FontWeight.SemiBold,
-                                        color = if (isRestDay) MutantTextSecondary else statusColor
+                                        color = statusColor
                                     )
                                 )
                             }
                             Text(
-                                text = "Next: ${systemStatus.nextScheduledTitle}",
+                                text = "Último treino: ${systemStatus.lastSessionTitle}",
                                 style = MaterialTheme.typography.bodyMedium.copy(color = MutantTextSecondary)
                             )
-                            if (!isRestDay && activeSession == null && todayProgramDay != null) {
+                            if (activeSession == null && recommendedProgramDay != null) {
                                 Spacer(modifier = Modifier.height(MutantSpacing.xs))
                                 MutantPrimaryButton(
                                     text = "START WORKOUT",
                                     onClick = {
-                                        selectedDayToStart = todayProgramDay
+                                        selectedDayToStart = recommendedProgramDay
                                         showReadinessDialog = true
                                     },
                                     modifier = Modifier.width(260.dp).testTag("start_workout_button"),
@@ -477,7 +477,7 @@ fun HomeScreen(
                     )
                     TextButton(
                         onClick = {
-                            targetProgramDayId = todayProgramDay?.id ?: programDays.firstOrNull()?.id
+                            targetProgramDayId = recommendedProgramDay?.id ?: programDays.firstOrNull()?.id
                             showAddExerciseDialog = true
                         }
                     ) {
@@ -490,9 +490,9 @@ fun HomeScreen(
 
             // Weekly Days List
             items(programDays) { day ->
-                val isToday = day.id == todayProgramDay?.id
+                val isNext = day.id == recommendedProgramDay?.id
                 val rowMarker = when {
-                    isToday -> Modifier.background(MaterialTheme.colorScheme.primary, CircleShape)
+                    isNext -> Modifier.background(MaterialTheme.colorScheme.primary, CircleShape)
                     day.isRestDay -> Modifier.background(MutantTextMuted.copy(alpha = 0.58f), CircleShape)
                     else -> Modifier.border(2.dp, MutantBorder, CircleShape)
                 }
@@ -506,7 +506,7 @@ fun HomeScreen(
                             }
                             .testTag("program_day_${day.dayIndex}"),
                         shape = MutantShapeTokens.InputChip,
-                        color = if (isToday) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f) else Color.Transparent
+                        color = if (isNext) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f) else Color.Transparent
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = MutantSpacing.sm, vertical = MutantSpacing.xs),
@@ -518,7 +518,7 @@ fun HomeScreen(
                                 modifier = Modifier.width(34.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.SemiBold,
-                                    color = if (isToday) MutantVolt else MutantTextMuted
+                                    color = if (isNext) MutantVolt else MutantTextMuted
                                 )
                             )
                             Box(modifier = Modifier.size(12.dp).then(rowMarker))
@@ -526,13 +526,13 @@ fun HomeScreen(
                                 Text(
                                     text = day.title,
                                     style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
+                                        fontWeight = if (isNext) FontWeight.Bold else FontWeight.Medium,
                                         color = if (day.isRestDay) MutantTextMuted else MutantTextPrimary
                                     )
                                 )
-                                if (isToday || day.isRestDay) {
+                                if (isNext || day.isRestDay) {
                                     Text(
-                                        text = if (isToday) "Today" else "Rest",
+                                        text = if (isNext) "Próximo treino" else "Rest",
                                         style = MaterialTheme.typography.labelSmall.copy(color = MutantTextSecondary)
                                     )
                                 }
@@ -826,7 +826,7 @@ fun HomeScreen(
                 if (chosenExercise != null) {
                     Button(
                         onClick = {
-                            val dayId = targetProgramDayId ?: todayProgramDay?.id ?: 1L
+                            val dayId = targetProgramDayId ?: recommendedProgramDay?.id ?: 1L
                             viewModel.addExerciseToProgram(
                                 dayId = dayId,
                                 exerciseId = chosenExercise!!.id,

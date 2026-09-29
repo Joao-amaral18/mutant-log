@@ -32,16 +32,18 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
+import java.util.TimeZone
 
 data class SystemStatus(
     val todayWorkoutTitle: String = "No active program",
     val todayDayCode: String = "SEG",
-    val lastSessionTitle: String = "No sessions logged",
+    val lastSessionTitle: String = "nenhum treino concluído",
     val lastSessionDaysAgo: Int = 0,
     val recoveryDaysText: String = "N/A",
     val fatigueStatus: String = "Normal",
     val nextScheduledTitle: String = "Create program to schedule",
+    val recommendedProgramDayId: Long? = null,
+    val recommendationBasis: RecommendationBasis = RecommendationBasis.UNAVAILABLE,
     val hasProgram: Boolean = false
 )
 
@@ -77,6 +79,7 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
     val activeWorkoutSession = repository.activeWorkoutSession
     val finishedWorkouts = repository.finishedWorkouts
     val lastFinishedWorkout = repository.lastFinishedWorkout
+    val lastFinishedRoutineWorkout = repository.lastFinishedRoutineWorkout
     val cardioSessions = repository.allCardioSessions
 
     private val _libraryCounts = MutableStateFlow(LibraryCounts())
@@ -90,6 +93,7 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _systemStatus = MutableStateFlow(SystemStatus())
     val systemStatus: StateFlow<SystemStatus> = _systemStatus.asStateFlow()
+    private val _deviceNowMillis = MutableStateFlow(System.currentTimeMillis())
 
     private val dao = database.mutantDao()
     private val _workoutDraft = MutableStateFlow<WorkoutDraft?>(null)
@@ -183,7 +187,13 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         // One UI clock for all screens; values always derive from persisted timestamps.
-        viewModelScope.launch { while (true) { refreshClock(); delay(1000) } }
+        viewModelScope.launch {
+            while (true) {
+                _deviceNowMillis.value = System.currentTimeMillis()
+                refreshClock()
+                delay(1000)
+            }
+        }
         // Preload canonical reference catalog (124 exercises, 186 machines, 15 muscle groups)
         viewModelScope.launch {
             repository.checkAndSeedInitialData()
@@ -199,10 +209,10 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
 
-        // Monitor last finished workout and program days to compute system status
+        // Recompute from persisted routine history and the device clock only.
         viewModelScope.launch {
-            combine(lastFinishedWorkout, programDays) { lastSession, days ->
-                computeSystemStatus(lastSession, days)
+            combine(activeProgram, lastFinishedRoutineWorkout, programDays, _deviceNowMillis) { program, lastSession, days, now ->
+                computeSystemStatus(program, lastSession, days, now)
             }.collect { status ->
                 _systemStatus.value = status
             }
@@ -496,49 +506,52 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private fun computeSystemStatus(lastWorkout: WorkoutSession?, days: List<ProgramDay>): SystemStatus {
-        val hasProgram = days.isNotEmpty()
-        val todayDay = if (hasProgram) days.firstOrNull { !it.isRestDay } ?: days.first() else null
-
-        if (lastWorkout == null) {
+    private fun computeSystemStatus(
+        activeProgram: Program?,
+        lastWorkout: WorkoutSession?,
+        days: List<ProgramDay>,
+        nowMillis: Long
+    ): SystemStatus {
+        if (days.isEmpty()) {
             return SystemStatus(
-                todayWorkoutTitle = todayDay?.title ?: "No active program",
-                todayDayCode = todayDay?.dayCode ?: "SEG",
-                lastSessionTitle = "No sessions logged",
-                lastSessionDaysAgo = 0,
-                recoveryDaysText = "N/A",
-                fatigueStatus = "Normal",
-                nextScheduledTitle = if (hasProgram) (days.getOrNull(1)?.title ?: "Next workout") else "Create program to schedule",
-                hasProgram = hasProgram
+                todayWorkoutTitle = "No active program",
+                nextScheduledTitle = "Create program to schedule"
             )
         }
 
-        val now = System.currentTimeMillis()
-        val diffMs = now - (lastWorkout.finishedAt ?: lastWorkout.startedAt)
-        val daysAgo = TimeUnit.MILLISECONDS.toDays(diffMs).toInt()
-
+        val recommendation = WorkoutRecommendationEngine.recommend(
+            programDays = days,
+            lastWorkout = lastWorkout,
+            persistedPosition = activeProgram?.currentRoutinePosition ?: -1,
+            nowMillis = nowMillis,
+            timeZone = TimeZone.getDefault()
+        )
+        val daysAgo = recommendation.daysSinceLastWorkout
         val recoveryText = when (daysAgo) {
+            null -> "Sem histórico"
             0 -> "Hoje mesmo"
             1 -> "1 dia completo"
             else -> "$daysAgo dias completos"
         }
 
         val fatigueSignal = when {
-            lastWorkout.readinessStatus.contains("fatigue", ignoreCase = true) -> "Fadiga detectada"
-            lastWorkout.jointDiscomfort in listOf("Moderate", "Severe") -> "Cuidado articular"
-            daysAgo >= 3 -> "Totalmente recuperado"
+            lastWorkout?.readinessStatus?.contains("fatigue", ignoreCase = true) == true -> "Fadiga detectada"
+            lastWorkout?.jointDiscomfort in listOf("Moderate", "Severe") -> "Cuidado articular"
+            daysAgo != null && daysAgo >= 3 -> "Totalmente recuperado"
             else -> "Normal"
         }
 
         return SystemStatus(
-            todayWorkoutTitle = todayDay?.title ?: "Workout",
-            todayDayCode = todayDay?.dayCode ?: "SEG",
-            lastSessionTitle = "${lastWorkout.title} — ${daysAgo}d atrás",
-            lastSessionDaysAgo = daysAgo,
+            todayWorkoutTitle = recommendation.title,
+            todayDayCode = recommendation.dayCode,
+            lastSessionTitle = recommendation.lastWorkoutSummary,
+            lastSessionDaysAgo = daysAgo ?: 0,
             recoveryDaysText = recoveryText,
             fatigueStatus = fatigueSignal,
-            nextScheduledTitle = days.getOrNull(1)?.title?.let { "$it — amanhã" } ?: "Próximo treino",
-            hasProgram = hasProgram
+            nextScheduledTitle = recommendation.title,
+            recommendedProgramDayId = recommendation.programDayId,
+            recommendationBasis = recommendation.basis,
+            hasProgram = true
         )
     }
 
