@@ -41,7 +41,7 @@ enum class NavDestination(
 ) {
     HOME("Protocol", Icons.Default.CalendarToday, "nav_home"),
     WORKOUT("Session", Icons.Default.FitnessCenter, "nav_workout"),
-    DOSSIER("Dossier", Icons.Default.AutoGraph, "nav_dossier"),
+    HISTORY("Histórico", Icons.Default.History, "nav_dossier"),
     VOLUME("Volume", Icons.Default.BarChart, "nav_volume"),
     CARDIO("Cardio", Icons.Default.DirectionsRun, "nav_cardio")
 }
@@ -108,10 +108,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableSharedFlow<Unit>) {
     val draft by viewModel.workoutDraft.collectAsState()
-    if (draft != null) {
-        CompletedWorkoutEditor(viewModel)
-        return
-    }
     var currentScreen by remember { mutableStateOf(NavDestination.HOME) }
     val activeSession by viewModel.activeWorkoutSession.collectAsState(initial = null)
 
@@ -212,7 +208,7 @@ fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableShar
                         viewModel = viewModel,
                         onNavigateBack = { currentScreen = NavDestination.HOME }
                     )
-                    NavDestination.DOSSIER -> ExerciseHistoryScreen(
+                    NavDestination.HISTORY -> HistoryScreen(
                         viewModel = viewModel,
                         onNavigateBack = { currentScreen = NavDestination.HOME }
                     )
@@ -227,5 +223,8 @@ fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableShar
                 }
             }
         }
+    }
+    if (draft != null) {
+        CompletedWorkoutEditor(viewModel)
     }
 }

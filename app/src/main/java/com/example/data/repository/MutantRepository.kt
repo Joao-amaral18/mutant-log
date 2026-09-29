@@ -4,6 +4,8 @@ import com.example.data.db.*
 import com.example.data.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 
@@ -27,6 +29,9 @@ data class LibraryCounts(
 )
 
 class MutantRepository(private val dao: MutantDao) {
+
+    val workoutHistory: Flow<List<HistoryWorkout>> = dao.observeWorkoutHistory()
+        .map { rows -> rows.map { it.toHistory() } }.flowOn(Dispatchers.Default)
 
     // --- REFERENCE DATA FLOWS ---
     val allExercises: Flow<List<Exercise>> = dao.getAllExercises()

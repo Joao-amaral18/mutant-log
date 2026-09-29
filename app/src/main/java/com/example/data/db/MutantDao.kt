@@ -39,6 +39,10 @@ data class ExerciseWithVariants(
 @Dao
 interface MutantDao {
 
+    @Transaction
+    @Query("SELECT * FROM workout_sessions WHERE finishedAt IS NOT NULL ORDER BY startedAt DESC, id DESC")
+    fun observeWorkoutHistory(): Flow<List<HistoryWorkoutRelation>>
+
     @Query("SELECT * FROM workout_sessions WHERE id = :id")
     suspend fun getSessionSync(id: Long): WorkoutSession?
     @Query("SELECT * FROM workout_sessions WHERE finishedAt IS NULL ORDER BY startedAt DESC LIMIT 1")

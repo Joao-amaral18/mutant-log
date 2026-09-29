@@ -82,6 +82,19 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
     val lastFinishedRoutineWorkout = repository.lastFinishedRoutineWorkout
     val cardioSessions = repository.allCardioSessions
 
+    private val historyReload = MutableStateFlow(0)
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val workoutHistory = historyReload.flatMapLatest {
+        repository.workoutHistory.map { HistoryUiState(workouts = it, loading = false) }
+            .onStart { emit(HistoryUiState()) }
+            .catch { e ->
+                if (e is CancellationException) throw e
+                emit(HistoryUiState(loading = false, error = "Não foi possível carregar o histórico."))
+            }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
+
+    fun reloadHistory() { historyReload.update { it + 1 } }
+
     private val _libraryCounts = MutableStateFlow(LibraryCounts())
     val libraryCounts: StateFlow<LibraryCounts> = _libraryCounts.asStateFlow()
 

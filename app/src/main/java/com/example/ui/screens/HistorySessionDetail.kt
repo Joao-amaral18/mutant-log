@@ -1,0 +1,104 @@
+package com.example.ui.screens
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.testTag
+import com.example.data.model.*
+import com.example.ui.designsystem.*
+import com.example.ui.designsystem.components.MutantCard
+
+@Composable
+internal fun HistorySessionDetail(workout: HistoryWorkout, all: List<HistoryWorkout>, onBack: () -> Unit, onEdit: (Long) -> Unit, editError: String?, editing: Boolean) {
+    Column(Modifier.fillMaxSize().testTag("history_session_detail")) {
+        HistoryHeader(workout.session.title, onBack) {
+            TextButton(onClick = { onEdit(workout.session.id) }, enabled = !editing, modifier = Modifier.testTag("history_edit")) { Text(if (editing) "Abrindo…" else "Editar") }
+        }
+        LazyColumn(contentPadding = PaddingValues(MutantSpacing.md), verticalArrangement = Arrangement.spacedBy(MutantSpacing.md)) {
+            item {
+                Text(historyDate(workout.session.startedAt, "dd/MM/yyyy"), style = MaterialTheme.typography.titleMedium)
+                Text("${historyDate(workout.session.startedAt, "HH:mm")} → ${historyDate(requireNotNull(workout.session.finishedAt), "HH:mm")} · ${historyDuration(workout.minutes)}", color = MutantColors.TextSecondary)
+                HistoryMetrics(listOf("Séries" to workout.sets.size.toString(), "Repetições" to workout.reps.toString(), "Volume" to "${historyNumber(workout.volume)} kg", "PRs" to workout.prs.toString()))
+                editError?.let { Text(it, color = MutantColors.Error) }
+            }
+            items(workout.exercises, key = { it.workoutExercise.id }) { ex ->
+                val previous = WorkoutHistory.previousExercise(all, workout, ex.exercise.id)
+                MutantCard {
+                    Text(ex.exercise.name.uppercase(historyLocale), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (ex.workoutExercise.notes.isNotBlank()) Text(ex.workoutExercise.notes, color = MutantColors.TextSecondary, modifier = Modifier.padding(top = MutantSpacing.xs))
+                    Spacer(Modifier.height(MutantSpacing.sm))
+                    Row(Modifier.fillMaxWidth()) {
+                        Text("Anterior", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MutantColors.TextSecondary)
+                        Text("Hoje", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MutantColors.Primary)
+                    }
+                    if (previous.isEmpty()) Text("Primeira sessão registrada deste exercício.", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary, modifier = Modifier.padding(vertical = MutantSpacing.xs))
+                    // Align warmups and work sets separately, so a new warmup cannot shift the comparison.
+                    ex.sets.groupBy { it.set.setType }.forEach { (type, sets) ->
+                        val before = previous.filter { it.set.setType == type }
+                        sets.forEachIndexed { index, set ->
+                            HorizontalDivider(Modifier.padding(vertical = MutantSpacing.xs), color = MutantColors.OutlineVariant)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MutantSpacing.sm)) {
+                                Column(Modifier.weight(1f)) { before.getOrNull(index)?.let { HistorySetDetails(it) } ?: Text("—", color = MutantColors.TextSecondary) }
+                                Column(Modifier.weight(1f)) { HistorySetDetails(set) }
+                            }
+                        }
+                    }
+                    if (ex.sets.isEmpty()) Text("Nenhuma série registrada", color = MutantColors.TextSecondary)
+                }
+            }
+            if (workout.session.notes.isNotBlank()) item {
+                Text("OBSERVAÇÕES", style = MaterialTheme.typography.labelLarge, color = MutantColors.TextSecondary)
+                Text(workout.session.notes)
+            }
+            items(workout.cardio, key = { "cardio-${it.id}" }) { cardio ->
+                MutantCard {
+                    Text(cardio.machine, style = MaterialTheme.typography.titleMedium)
+                    Text("${historyDuration(cardio.durationMinutes)} · RPE ${cardio.rpe} · ${cardio.avgHeartRate} bpm · Nível ${cardio.level}")
+                    if (cardio.notes.isNotBlank()) Text(cardio.notes, color = MutantColors.TextSecondary)
+                }
+            }
+            item {
+                Text("RESUMO", style = MaterialTheme.typography.labelLarge, color = MutantColors.TextSecondary)
+                HistoryMetrics(listOf("Exercícios" to workout.exercises.size.toString(), "Séries" to workout.sets.size.toString(), "Repetições" to workout.reps.toString(), "Volume" to "${historyNumber(workout.volume)} kg", "Duração" to historyDuration(workout.minutes), "PRs" to workout.prs.toString()))
+                Text("Totais de trabalho, incluindo segmentos de drop set e rest-pause. Aquecimentos ficam fora dos totais.", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
+            }
+            item {
+                val previous = WorkoutHistory.previous(all, workout)
+                if (previous != null) {
+                    MutantCard {
+                        Text("VS. ÚLTIMO ${previous.session.title.uppercase(historyLocale)}", style = MaterialTheme.typography.labelLarge, color = MutantColors.Primary)
+                        Text(historyDate(previous.session.startedAt, "dd/MM/yyyy"), style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
+                        HistoryComparison("Volume", "${historyNumber(workout.volume)} kg", workout.volume - previous.volume, " kg")
+                        HistoryComparison("Repetições", workout.reps.toString(), (workout.reps - previous.reps).toDouble())
+                        HistoryComparison("Séries", workout.sets.size.toString(), (workout.sets.size - previous.sets.size).toDouble())
+                        HistoryComparison("PRs", workout.prs.toString(), (workout.prs - previous.prs).toDouble())
+                    }
+                } else Text("A comparação estará disponível após outro treino equivalente.", color = MutantColors.TextSecondary, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun HistorySetDetails(history: HistorySet) {
+    val set = history.set
+    Text(historySetText(set), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+    Text(if (set.setType == SetType.WARMUP) "Aquecimento · RIR ${set.rir}" else "RIR ${set.rir}${if (set.rir == 0) " · Falha / sem reserva" else ""}", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
+    if (set.isPr) Text("PR · ${when (set.prType) { "LOAD" -> "Carga"; "REP" -> "Repetições"; else -> "Performance" }}", color = MutantColors.Warning, style = MaterialTheme.typography.labelSmall)
+    if (set.technique != IntensityTechnique.NONE) Text(when (set.technique) { IntensityTechnique.REST_PAUSE -> "Rest-pause"; IntensityTechnique.DROP_SET -> "Drop set"; IntensityTechnique.ASSISTED_REPS -> "Reps assistidas"; IntensityTechnique.PARTIAL_REPS -> "Reps parciais"; else -> "" }, style = MaterialTheme.typography.bodySmall, color = MutantColors.Primary)
+    history.segments.forEach { Text("+ ${historyNumber(it.weightKg)} × ${it.reps} · ${it.restSeconds}s", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary) }
+}
+
+@Composable
+private fun HistoryComparison(label: String, value: String, delta: Double, unit: String = "") {
+    Row(Modifier.fillMaxWidth().padding(top = MutantSpacing.sm), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.width(MutantSpacing.sm))
+        Text(if (delta == 0.0) "=" else "${if (delta > 0) "+" else ""}${historyNumber(delta)}$unit", color = if (delta > 0) MutantColors.Success else MutantColors.TextSecondary, style = MaterialTheme.typography.bodyMedium)
+    }
+}
