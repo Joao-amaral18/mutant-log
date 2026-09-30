@@ -59,6 +59,12 @@ class MutantRepository(private val dao: MutantDao) {
     fun getProgramExercisesForDay(dayId: Long): Flow<List<ProgramExerciseDetail>> =
         dao.getProgramExercisesForDay(dayId)
 
+    val programDaySummaries: Flow<List<ProgramDaySummary>> = dao.observeProgramDaySummaries()
+
+    suspend fun getPreviousWorkSets(exerciseId: Long): List<WorkoutSet> = withContext(Dispatchers.IO) {
+        dao.getLastSessionWorkSetsForExercise(exerciseId).filter { it.setType == SetType.WORK }
+    }
+
     fun getWorkoutExercisesWithDetails(sessionId: Long): Flow<List<WorkoutExerciseDetail>> =
         dao.getWorkoutExercisesWithDetails(sessionId)
 

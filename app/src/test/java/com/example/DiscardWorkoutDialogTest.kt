@@ -56,21 +56,22 @@ class DiscardWorkoutDialogTest {
                 DiscardWorkoutDialog(busy.value, null, { canceled++ }, { discarded++; busy.value = true })
             }
         }
-        compose.onNodeWithText("Discard workout?").assertExists()
-        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText("Discard session?").assertExists()
+        compose.onNodeWithText("Keep going").performClick()
         assertEquals(1, canceled)
         val file = File("build/test-artifacts/discard-confirmation.png")
         file.parentFile?.mkdirs()
         compose.runOnIdle {
-            val view = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+            val view = org.robolectric.shadows.ShadowDialog.getLatestDialog()?.window?.decorView ?: return@runOnIdle
+            if (view.width == 0 || view.height == 0) return@runOnIdle
             val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
             view.draw(android.graphics.Canvas(bitmap))
             file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
         }
         compose.onNodeWithText("Discard").performClick()
         assertEquals(1, discarded)
-        compose.onNodeWithText("Discarding workout...").assertExists()
+        compose.onNodeWithText("Discarding session…").assertExists()
         compose.onNodeWithText("Discard").assertDoesNotExist()
-        compose.onNodeWithText("Cancel").assertDoesNotExist()
+        compose.onNodeWithText("Keep going").assertDoesNotExist()
     }
 }

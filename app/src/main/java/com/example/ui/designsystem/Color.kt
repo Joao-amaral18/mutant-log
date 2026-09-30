@@ -4,22 +4,26 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
 
 object MutantColors {
-    val Background = Color(0xFF09070D)
+    val Background = Color(0xFF0C0B10)
 
-    val Surface = Color(0xFF100D16)
-    val SurfaceContainerLow = Color(0xFF131018)
-    val SurfaceContainer = Color(0xFF17121F)
-    val SurfaceContainerHigh = Color(0xFF211B2B)
-    val SurfaceContainerHighest = Color(0xFF2A2337)
+    val Surface = Color(0xFF16141D)
+    val SurfaceContainerLow = Color(0xFF121017)
+    val SurfaceContainer = Color(0xFF16141D)
+    val SurfaceContainerHigh = Color(0xFF1E1B27)
+    val SurfaceContainerHighest = Color(0xFF2A2634)
 
     // Brand purple is reserved for current, selected, and primary-action states.
-    val Primary = Color(0xFFB388FF)
-    val OnPrimary = Color(0xFF23003D)
+    val Primary = Color(0xFFA98BFF)
+    val OnPrimary = Color(0xFF150F24)
+    val PrimarySelected = Color(0x24A98BFF)
+    val PrimaryIndicator = Color(0x38A98BFF)
+    val PrimaryTint = Color(0x14A98BFF)
+    val PrimaryTintBorder = Color(0x59A98BFF)
 
-    val PrimaryContainer = Color(0xFF432267)
-    val OnPrimaryContainer = Color(0xFFE9DDFF)
+    val PrimaryContainer = Color(0xFF2E2547)
+    val OnPrimaryContainer = Color(0xFFE6DEFF)
 
-    val Secondary = Color(0xFFD0BCFF)
+    val Secondary = Color(0xFFC7B4FF)
     val OnSecondary = Color(0xFF332D41)
 
     val SecondaryContainer = Color(0xFF4A4458)
@@ -28,22 +32,29 @@ object MutantColors {
     val Tertiary = Color(0xFF9D8CFF)
     val OnTertiary = Color(0xFF1F1651)
 
-    val TextPrimary = Color(0xFFEAE5EE)
-    val TextSecondary = Color(0xFFCBC3D3)
-    val TextMetadata = Color(0xFF948C9D)
+    val TextPrimary = Color(0xFFF3F1F8)
+    val TextSecondary = Color(0xFFA29DB0)
+    val TextMetadata = Color(0xFF6F6A7D)
 
-    val Outline = Color(0xFF49424F)
-    val OutlineVariant = Color(0xFF302A36)
+    val Outline = Color(0xFF2F2B3B)
+    // Control borders sit between card borders and sheet lines.
+    val Line = Color(0xFF2A2634)
+    val Handle = Color(0xFF3A3547)
+    val Scrim = Color(0xB8050408)
+    val Toast = Color(0xFFF3F1F8)
+    val OnToast = Color(0xFF0C0B10)
+    val ToastAccent = Color(0xFF6A4BD6)
+    val OutlineVariant = Color(0xFF25222F)
 
-    val Success = Color(0xFF4ADE80)
-    val SuccessContainer = Color(0xFF193B26)
+    val Success = Color(0xFF5BD69B)
+    val SuccessContainer = Color(0xFF16291F)
 
-    val Warning = Color(0xFFFBBF24)
-    val WarningContainer = Color(0xFF422E0B)
+    val Warning = Color(0xFFF2B65A)
+    val WarningContainer = Color(0xFF2E2415)
 
-    val Error = Color(0xFFFFB4AB)
-    val OnError = Color(0xFF690005)
-    val ErrorContainer = Color(0xFF491216)
+    val Error = Color(0xFFFF6B6B)
+    val OnError = Color(0xFF1A0707)
+    val ErrorContainer = Color(0xFF2E1618)
 
     // Aliases for MutantPalette compatibility across screens & components
     val AppBackground = Background

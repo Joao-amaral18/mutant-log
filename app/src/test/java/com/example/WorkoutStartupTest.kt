@@ -47,7 +47,7 @@ class WorkoutStartupTest {
             org.junit.Assert.assertFalse(ready!!.isLoading)
             org.junit.Assert.assertEquals("Startup test", ready!!.session!!.title)
             org.junit.Assert.assertEquals(listOf(exerciseId), ready!!.exercises.map { it.exercise.id })
-            compose.onNodeWithText("NO ACTIVE WORKOUT").assertDoesNotExist()
+            compose.onNodeWithText("No workout running.").assertDoesNotExist()
         } finally {
             val id = vm.activeWorkoutUiState.value.session?.id
             store.clear()
@@ -55,7 +55,7 @@ class WorkoutStartupTest {
         }
     }
 
-    @Test fun `active session waiting for exercises never shows no active workout`() {
+    @Test fun `active session waiting for exercises never shows the idle session`() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val db = MutantDatabase.getDatabase(app)
         val id = runBlocking { db.mutantDao().insertWorkoutSession(WorkoutSession(title = "Starting")) }
@@ -64,7 +64,7 @@ class WorkoutStartupTest {
         try {
             compose.setContent { MyApplicationTheme { ActiveWorkoutScreen(vm, {}) } }
             compose.waitUntil(10_000) { vm.activeWorkoutUiState.value.session?.id == id }
-            compose.onNodeWithText("NO ACTIVE WORKOUT").assertDoesNotExist()
+            compose.onNodeWithText("No workout running.").assertDoesNotExist()
         } finally {
             store.clear()
             runBlocking { db.mutantDao().discardWorkoutSession(id) }

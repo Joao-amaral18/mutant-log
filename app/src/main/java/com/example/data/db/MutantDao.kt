@@ -13,6 +13,14 @@ data class ProgramExerciseDetail(
     val exercise: Exercise
 )
 
+/** Per-day plan totals for the protocol list. */
+data class ProgramDaySummary(
+    val programDayId: Long,
+    val exerciseCount: Int,
+    val setCount: Int,
+    val restSeconds: Int
+)
+
 data class WorkoutExerciseDetail(
     @Embedded val workoutExercise: WorkoutExercise,
     @Relation(
@@ -259,6 +267,13 @@ interface MutantDao {
     @Transaction
     @Query("SELECT * FROM program_exercises WHERE programDayId = :dayId ORDER BY orderIndex ASC")
     fun getProgramExercisesForDay(dayId: Long): Flow<List<ProgramExerciseDetail>>
+
+    @Query("""
+        SELECT programDayId, COUNT(*) AS exerciseCount, SUM(targetWorkSets) AS setCount,
+               SUM(targetWorkSets * restSeconds) AS restSeconds
+        FROM program_exercises GROUP BY programDayId
+    """)
+    fun observeProgramDaySummaries(): Flow<List<ProgramDaySummary>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProgramExercise(pe: ProgramExercise): Long

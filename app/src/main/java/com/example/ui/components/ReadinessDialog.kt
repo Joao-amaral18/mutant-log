@@ -1,327 +1,142 @@
 package com.example.ui.components
 
-import com.example.ui.designsystem.MutantStrokeWidths
-
-import com.example.ui.designsystem.MutantTracking
-
-import com.example.ui.designsystem.MutantSpacing
-
-import com.example.ui.designsystem.MutantShapeTokens
-
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.*
+import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.example.data.repository.ReadinessInput
-import com.example.ui.theme.*
+import com.example.ui.designsystem.MutantColors
+import com.example.ui.designsystem.MutantType
+import com.example.ui.designsystem.components.*
+import kotlin.math.roundToInt
+
+private val JointLevels = listOf("None", "Mild", "Moderate", "Severe")
+
+internal data class ReadinessVerdict(val label: String, val color: Color, val icon: ImageVector, val message: String)
+
+/** 0–100. Sleep, energy and focus carry 60%; soreness and joint pain 20% each. */
+internal fun readinessScore(input: ReadinessInput): Int {
+    val joint = JointLevels.indexOfFirst { it.equals(input.jointDiscomfort, ignoreCase = true) }.coerceAtLeast(0)
+    val drive = (input.sleep + input.energy + input.motivation - 3) / 12f
+    val soreness = (5 - input.soreness) / 4f
+    val joints = (3 - joint) / 3f
+    return ((drive * 0.6f + soreness * 0.2f + joints * 0.2f) * 100).roundToInt().coerceIn(0, 100)
+}
+
+internal fun readinessVerdict(score: Int): ReadinessVerdict = when {
+    score >= 70 -> ReadinessVerdict("Ready", MutantColors.Success, Icons.Rounded.Bolt,
+        "Green light. Go for today’s targets.")
+    score >= 45 -> ReadinessVerdict("Moderate", MutantColors.Warning, Icons.Rounded.Warning,
+        "Partly recovered. Hold loads and stay at the top of the RIR range.")
+    else -> ReadinessVerdict("High fatigue", MutantColors.Error, Icons.Rounded.Error,
+        "Fatigue is stacking up. Drop one set per exercise, or take a rest day.")
+}
 
 @Composable
 fun ReadinessDialog(
+    workoutTitle: String = "",
     initialInput: ReadinessInput = ReadinessInput(),
     onDismiss: () -> Unit,
     onConfirm: (ReadinessInput) -> Unit
 ) {
-    var sleep by remember { mutableStateOf(initialInput.sleep) }
-    var energy by remember { mutableStateOf(initialInput.energy) }
-    var soreness by remember { mutableStateOf(initialInput.soreness) }
-    var jointDiscomfort by remember { mutableStateOf(initialInput.jointDiscomfort) }
-    var motivation by remember { mutableStateOf(initialInput.motivation) }
+    var input by remember { mutableStateOf(initialInput) }
+    val score = readinessScore(input)
+    val verdict = readinessVerdict(score)
 
-    // Live readiness calculation
-    val isFatigued = jointDiscomfort in listOf("Moderate", "Severe") || (energy <= 2 && soreness >= 4)
-    val statusText = if (isFatigued) "High fatigue detected" else "Normal"
-    val statusColor = if (isFatigued) MutantAmber else MutantEmerald
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
-                .clip(MutantShapeTokens.LargePanel)
-                .testTag("readiness_dialog"),
-            color = MutantSurfaceCard,
-            border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantBorder)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(MutantSpacing.lgMd)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "SYSTEM READINESS",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MutantTextPrimary,
-                            letterSpacing = MutantTracking.Compact
-                        )
+    MutantBottomSheet(onDismiss = onDismiss, modifier = Modifier.testTag("readiness_dialog")) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    MutantEyebrow(
+                        if (workoutTitle.isBlank()) "READINESS" else "READINESS · ${workoutTitle.uppercase()}",
+                        color = MutantColors.TextSecondary,
+                        style = MutantType.Eyebrow.copy(fontSize = 10.5.sp, letterSpacing = 0.1.em)
                     )
+                    Text("How are you feeling?", style = MutantType.SheetTitle.copy(fontSize = 30.sp), color = MutantColors.TextPrimary)
+                }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("$score", style = MutantType.MonoValue.copy(fontSize = 28.sp, lineHeight = 30.sp), color = verdict.color,
+                        modifier = Modifier.testTag("readiness_score"))
+                    Text(verdict.label, style = MutantType.Chip.copy(fontSize = 11.sp), color = verdict.color)
+                }
+            }
 
-                    Surface(
-                        color = statusColor.copy(alpha = 0.15f),
-                        shape = MutantShapeTokens.SmallControl,
-                        border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, statusColor.copy(alpha = 0.5f))
-                    ) {
-                        Text(
-                            text = statusText,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = statusColor
-                            ),
-                            modifier = Modifier.padding(horizontal = MutantSpacing.xs, vertical = MutantSpacing.xxs)
+            ScaleRow("Sleep", listOf("Awful", "Poor", "OK", "Good", "Great"), input.sleep, "sleep") { input = input.copy(sleep = it) }
+            ScaleRow("Energy", listOf("Empty", "Low", "OK", "High", "Maxed"), input.energy, "energy") { input = input.copy(energy = it) }
+            ScaleRow("Soreness", listOf("None", "Mild", "Moderate", "Strong", "Severe"), input.soreness, "soreness") { input = input.copy(soreness = it) }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Joint pain", style = MutantType.RowTitle.copy(fontSize = 14.sp), color = MutantColors.TextPrimary)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    JointLevels.forEach { level ->
+                        MutantChoiceChip(
+                            label = level,
+                            selected = input.jointDiscomfort.equals(level, ignoreCase = true),
+                            onClick = { input = input.copy(jointDiscomfort = level) },
+                            modifier = Modifier.weight(1f).testTag("readiness_joint_$level"),
+                            height = 44.dp, cornerRadius = 12.dp, horizontalPadding = 0.dp,
+                            textStyle = MutantType.Chip.copy(fontSize = 13.sp)
                         )
                     }
                 }
+            }
+            ScaleRow("Focus", listOf("None", "Low", "OK", "High", "Locked in"), input.motivation, "focus") { input = input.copy(motivation = it) }
 
-                Text(
-                    text = "Calibrate neuromuscular status before initiating session.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = MutantTextSecondary),
-                    modifier = Modifier.padding(top = MutantSpacing.xxs, bottom = MutantSpacing.md)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(verdict.color.copy(alpha = 0.10f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(verdict.icon, contentDescription = null, tint = verdict.color, modifier = Modifier.size(18.dp))
+                Text(verdict.message, style = MutantType.BodySmall, color = MutantColors.TextPrimary)
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                MutantButton(
+                    "Cancel", onClick = onDismiss, style = MutantButtonStyle.Outline,
+                    height = 56.dp, modifier = Modifier.weight(1f)
                 )
-
-                // Sleep Score (1-5)
-                ScoreSelectorRow(
-                    label = "Sleep Quality",
-                    value = sleep,
-                    onSelect = { sleep = it }
+                MutantButton(
+                    "Start workout", onClick = { onConfirm(input) }, height = 56.dp,
+                    modifier = Modifier.weight(2f).testTag("confirm_readiness_button")
                 )
-
-                Spacer(modifier = Modifier.height(MutantSpacing.sm))
-
-                // Energy (1-5)
-                ScoreSelectorRow(
-                    label = "Energy Level",
-                    value = energy,
-                    onSelect = { energy = it }
-                )
-
-                Spacer(modifier = Modifier.height(MutantSpacing.sm))
-
-                // Soreness (1-5)
-                ScoreSelectorRow(
-                    label = "Muscle Soreness",
-                    value = soreness,
-                    onSelect = { soreness = it },
-                    higherIsWorse = true
-                )
-
-                Spacer(modifier = Modifier.height(MutantSpacing.sm))
-
-                // Joint Discomfort
-                Text(
-                    text = "Joint Discomfort",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        color = MutantTextSecondary
-                    ),
-                    modifier = Modifier.padding(bottom = MutantSpacing.compact)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(MutantSpacing.compact)
-                ) {
-                    listOf("None", "Mild", "Moderate", "Severe").forEach { level ->
-                        val selected = jointDiscomfort.equals(level, ignoreCase = true)
-                        val badgeColor = when (level) {
-                            "None" -> MutantEmerald
-                            "Mild" -> MutantCyan
-                            "Moderate" -> MutantAmber
-                            else -> MutantRed
-                        }
-
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(36.dp)
-                                .clickable { jointDiscomfort = level },
-                            shape = MutantShapeTokens.TinyControl,
-                            color = if (selected) badgeColor.copy(alpha = 0.25f) else MutantDarkNavy,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (selected) badgeColor else MutantBorder
-                            )
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = level,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (selected) badgeColor else MutantTextSecondary
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(MutantSpacing.sm))
-
-                // Motivation (1-5)
-                ScoreSelectorRow(
-                    label = "Focus & Motivation",
-                    value = motivation,
-                    onSelect = { motivation = it }
-                )
-
-                if (isFatigued) {
-                    Spacer(modifier = Modifier.height(MutantSpacing.mdPlus))
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MutantAmber.copy(alpha = 0.12f),
-                        shape = MutantShapeTokens.TinyControl,
-                        border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantAmber.copy(alpha = 0.4f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(MutantSpacing.compactMd),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = MutantAmber,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(MutantSpacing.xs))
-                            Text(
-                                text = "High fatigue detected. The system suggests consolidating loads or reducing working volume.",
-                                style = MaterialTheme.typography.bodySmall.copy(color = MutantAmber)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(MutantSpacing.lgMd))
-
-                // Action buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(MutantSpacing.compactMd)
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MutantTextSecondary),
-                        border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantBorder),
-                        shape = MutantShapeTokens.CompactControl
-                    ) {
-                        Text("CANCEL")
-                    }
-
-                    Button(
-                        onClick = {
-                            onConfirm(
-                                ReadinessInput(
-                                    sleep = sleep,
-                                    energy = energy,
-                                    soreness = soreness,
-                                    jointDiscomfort = jointDiscomfort,
-                                    motivation = motivation
-                                )
-                            )
-                        },
-                        modifier = Modifier
-                            .weight(1.4f)
-                            .testTag("confirm_readiness_button"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MutantVolt,
-                            contentColor = MutantOnVolt
-                        ),
-                        shape = MutantShapeTokens.CompactControl
-                    ) {
-                        Text(
-                            text = "START SESSION",
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black)
-                        )
-                    }
-                }
             }
         }
     }
 }
 
 @Composable
-private fun ScoreSelectorRow(
-    label: String,
-    value: Int,
-    onSelect: (Int) -> Unit,
-    higherIsWorse: Boolean = false
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = MutantTextSecondary
-                )
-            )
-            Text(
-                text = "$value / 5",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = MutantTextPrimary
-                )
-            )
+private fun ScaleRow(label: String, hints: List<String>, value: Int, tag: String, onSelect: (Int) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MutantType.RowTitle.copy(fontSize = 14.sp), color = MutantColors.TextPrimary)
+            Text(hints.getOrElse(value - 1) { "" }, style = MutantType.Caption.copy(fontWeight = FontWeight.Medium),
+                color = MutantColors.TextSecondary)
         }
-
-        Spacer(modifier = Modifier.height(MutantSpacing.compact))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(MutantSpacing.compact)
-        ) {
-            (1..5).forEach { num ->
-                val selected = num == value
-                val activeColor = if (higherIsWorse) {
-                    if (num >= 4) MutantRed else if (num >= 3) MutantAmber else MutantEmerald
-                } else {
-                    if (num >= 4) MutantEmerald else if (num >= 3) MutantCyan else MutantAmber
-                }
-
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(34.dp)
-                        .clickable { onSelect(num) },
-                    shape = MutantShapeTokens.TinyControl,
-                    color = if (selected) activeColor.copy(alpha = 0.25f) else MutantDarkNavy,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (selected) activeColor else MutantBorder
-                    )
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = num.toString(),
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selected) activeColor else MutantTextSecondary
-                            )
-                        )
-                    }
-                }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            (1..5).forEach { option ->
+                MutantChoiceChip(
+                    label = option.toString(), selected = option == value, onClick = { onSelect(option) },
+                    modifier = Modifier.weight(1f).testTag("readiness_${tag}_$option"),
+                    height = 44.dp, cornerRadius = 12.dp, horizontalPadding = 0.dp,
+                    textStyle = MutantType.Chip.copy(fontSize = 13.sp)
+                )
             }
         }
     }
