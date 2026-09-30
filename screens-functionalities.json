@@ -1,0 +1,173 @@
+{
+  "app": "Mutant Log",
+  "description": "Local-first Android workout tracker for training programs, readiness, live workout logging, progression, rest timing, history, cardio, volume analysis, and JSON export.",
+  "navigation": {
+    "type": "Enum-based Compose navigation in MainActivity; no Navigation Compose graph.",
+    "bottom_tabs": [
+      { "id": "home", "label": "Protocol", "destination": "HomeScreen" },
+      { "id": "workout", "label": "Session", "destination": "ActiveWorkoutScreen" },
+      { "id": "history", "label": "Histórico", "destination": "HistoryScreen" },
+      { "id": "cardio", "label": "Cardio", "destination": "CardioScreen" }
+    ],
+    "behavior": [
+      "Android back from a non-home tab returns to Home.",
+      "The bottom navigation is hidden while an active workout session is open.",
+      "Rest-timer notification actions can open the workout screen and adjust or skip the timer."
+    ]
+  },
+  "screens": [
+    {
+      "id": "home_protocol",
+      "name": "Protocol / Home",
+      "component": "HomeScreen",
+      "navigation": "Bottom tab",
+      "functionalities": [
+        "Shows the selected gym, settings access, recommended next workout, last workout, recovery days, and fatigue status.",
+        "Starts the recommended or selected non-rest program day after collecting readiness input.",
+        "Shows progress and a resume action when a workout is already active.",
+        "Lists weekly program days and allows starting a day or adding an exercise to a day.",
+        "Creates a custom training program with a seven-day split, or loads the Nick Walker reconstruction template when there is no program.",
+        "Adds catalog exercises to a program day by searching/filtering by muscle group, choosing an available equipment variant, and selecting Add to Program.",
+        "Creates a custom exercise equipment variant with name, manufacturer, resistance type, seat, and handle details.",
+        "Displays exercise and machine catalog counts in the no-program state."
+      ],
+      "dialogs": [
+        "System readiness: sleep, energy, soreness, joint discomfort, and motivation; displays a fatigue warning based on the entered values.",
+        "Gym picker: selects the active gym facility.",
+        "Settings and data export: creates and shares a JSON analysis export.",
+        "Create program: enters a program title and description, then initializes the default weekly split.",
+        "Add exercise: searches catalog exercises, filters by muscle, selects a variant, and adds it to the selected day.",
+        "Create custom variant: defines equipment-specific setup for an exercise."
+      ]
+    },
+    {
+      "id": "active_workout",
+      "name": "Session / Active Workout",
+      "component": "ActiveWorkoutScreen",
+      "navigation": "Bottom tab, Home resume/start actions, or rest-timer notification intent",
+      "functionalities": [
+        "Resumes the persisted active session and displays its exercises, current exercise, prescribed work sets, rep range, RIR, progression target, and previous performance.",
+        "Switches between exercises and indicates exercise completion progress.",
+        "Logs warm-up and work sets with load, reps, RIR, intensity technique, and optional drop-set or rest-pause segments.",
+        "Shows a plate estimate based on a 20 kg bar and the selected load.",
+        "Displays and allows editing of exercise setup (seat position, handle position, gym notes) and execution cues.",
+        "Collects post-set execution quality and target-muscle sensation feedback.",
+        "Displays recorded sets, personal-record markers, and permits deleting sets.",
+        "Runs a persisted rest timer with recommended duration, play/pause, -15 and +30 second adjustment, skip, sound/notification toggle, and completion haptic feedback.",
+        "Finishes the session with bodyweight and session notes, then saves and audits progression.",
+        "Discards an active workout after confirmation."
+      ],
+      "dialogs": [
+        "Free session: starts an ad-hoc workout with a custom title and selected catalog exercises.",
+        "Intensity segments: adds or removes drop-set/rest-pause segments and records load, reps, and rest duration.",
+        "Progression explanation: explains the double-progression target and load increase conditions.",
+        "Finish session: records bodyweight and workout notes before saving.",
+        "Discard session: confirms removal of the active session."
+      ],
+      "empty_states": [
+        "With no active session, offers navigation to Protocols, a free-session start action, and a link to workout history.",
+        "If an active session has no exercises, offers discard and navigation back to Protocols."
+      ]
+    },
+    {
+      "id": "workout_history",
+      "name": "History",
+      "component": "HistoryScreen",
+      "navigation": "Bottom tab or links from the workout empty state and workout screen",
+      "functionalities": [
+        "Provides three internal views: workout timeline, exercise history, and calendar.",
+        "Shows workout history loading and error states, with retry on error.",
+        "Opens a completed workout detail or an exercise history detail."
+      ],
+      "subviews": [
+        {
+          "id": "history_timeline",
+          "name": "Workouts",
+          "functionalities": [
+            "Searches and filters completed workouts by title, date range (7 or 30 days), and personal records.",
+            "Browses workouts by month and groups results by today, yesterday, this week, or month.",
+            "Shows workout duration, exercise and set counts, volume, and PR count; opens session detail."
+          ]
+        },
+        {
+          "id": "history_exercises",
+          "name": "Exercises",
+          "functionalities": [
+            "Searches exercises in completed workout history.",
+            "Sorts by most recent, name, most used, or greatest progress.",
+            "Shows session count, latest and best set, and estimated one-rep max; opens exercise detail."
+          ]
+        },
+        {
+          "id": "history_calendar",
+          "name": "Calendar",
+          "functionalities": [
+            "Browses workout months and marks calendar days that contain sessions.",
+            "Selects a date and lists its completed workouts; opens session detail."
+          ]
+        },
+        {
+          "id": "history_session_detail",
+          "name": "Completed Workout Detail",
+          "functionalities": [
+            "Shows workout date, duration, sets, reps, volume, PRs, exercise notes, warm-ups, work sets, intensity techniques, and set segments.",
+            "Compares exercise sets with the previous performance and compares the workout with the previous equivalent session.",
+            "Shows workout notes, associated cardio entries, and session totals.",
+            "Opens the completed-workout editor."
+          ]
+        },
+        {
+          "id": "history_exercise_detail",
+          "name": "Exercise History Detail",
+          "functionalities": [
+            "Shows latest performance, best load, estimated one-rep max, and number of sessions.",
+            "Charts evolution by estimated one-rep max, weight, volume, or reps.",
+            "Lists personal records and workout-by-workout set history; opens the associated workout detail."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "completed_workout_editor",
+      "name": "Edit Completed Workout",
+      "component": "CompletedWorkoutEditor",
+      "navigation": "Opened from a completed workout detail; shown as a full-screen overlay.",
+      "functionalities": [
+        "Edits the completed workout title and notes.",
+        "Edits each recorded set's weight, reps, and RIR with input validation.",
+        "Saves changes to the workout draft or cancels editing.",
+        "Prompts before discarding unsaved edits."
+      ]
+    },
+    {
+      "id": "cardio",
+      "name": "Cardio",
+      "component": "CardioScreen",
+      "navigation": "Bottom tab",
+      "functionalities": [
+        "Logs cardio sessions for Stairmaster, Incline Walk, Treadmill, or Bike.",
+        "Records duration, level/incline, average heart rate, RPE, and notes, then saves the cardio log.",
+        "Lists prior cardio sessions with machine, duration, level, heart rate, RPE, and timestamp."
+      ]
+    },
+    {
+      "id": "volume_analytics",
+      "name": "System Metrics & Volume",
+      "component": "VolumeAnalyticsScreen",
+      "navigation": "Not connected to MainActivity navigation; no in-app route was found.",
+      "reachability": "Declared in the source tree but not currently reachable through the shipped screen navigation.",
+      "functionalities": [
+        "Presents a fatigue accumulation diagnostic card and protocol recommendation chips.",
+        "Displays direct and indirect hard-set volume by muscle group for a seven-day period.",
+        "Shows examples of load, rep, and technique personal-record comparisons.",
+        "The current volume rows and PR examples are hard-coded sample presentation data in this screen."
+      ]
+    }
+  ],
+  "global_features": [
+    "Workout sessions, exercises, sets, progression targets, exercise index, and rest-timer state are persisted through Room-backed flows.",
+    "Rest timer service and notifications support opening the workout, adding timer time, and skipping the timer.",
+    "Workout completion records the completed session and updates progression/history data.",
+    "Settings data export shares a JSON snapshot containing workouts, sets, program, bodyweight, cardio, and recovery information."
+  ]
+}
