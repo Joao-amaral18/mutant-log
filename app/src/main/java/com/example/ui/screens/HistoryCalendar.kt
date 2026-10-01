@@ -22,9 +22,9 @@ import java.util.Calendar
 @Composable
 internal fun HistoryMonthSelector(month: Calendar, onPrevious: () -> Unit, onNext: () -> Unit, nextEnabled: Boolean = true) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onPrevious, modifier = Modifier.testTag("history_previous_month")) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Mês anterior") }
+        IconButton(onClick = onPrevious, modifier = Modifier.testTag("history_previous_month")) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous month") }
         Text(historyDate(month.timeInMillis, "MMMM yyyy").replaceFirstChar { it.titlecase(historyLocale) }, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-        IconButton(onClick = onNext, enabled = nextEnabled, modifier = Modifier.testTag("history_next_month")) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Próximo mês") }
+        IconButton(onClick = onNext, enabled = nextEnabled, modifier = Modifier.testTag("history_next_month")) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next month") }
     }
 }
 
@@ -43,9 +43,9 @@ internal fun HistoryCalendar(workouts: List<HistoryWorkout>, onOpen: (Long) -> U
     LazyColumn(Modifier.fillMaxSize().testTag("history_calendar"), contentPadding = PaddingValues(MutantSpacing.md), verticalArrangement = Arrangement.spacedBy(MutantSpacing.md)) {
         item {
             HistoryMonthSelector(month, { offset--; selected = historyDate(historyMonth(offset).timeInMillis, "yyyy-MM-dd") }, { offset++; selected = historyDate(historyMonth(offset).timeInMillis, "yyyy-MM-dd") }, offset < 0)
-            Text("${monthSessions.size} treinos neste mês", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
+            Text("${monthSessions.size} workouts this month", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
             Row(Modifier.fillMaxWidth()) {
-                listOf("S", "T", "Q", "Q", "S", "S", "D").forEach { Text(it, modifier = Modifier.weight(1f).wrapContentWidth().padding(vertical = MutantSpacing.sm), style = MaterialTheme.typography.labelMedium, color = MutantColors.TextSecondary) }
+                listOf("M", "T", "W", "T", "F", "S", "S").forEach { Text(it, modifier = Modifier.weight(1f).wrapContentWidth().padding(vertical = MutantSpacing.sm), style = MaterialTheme.typography.labelMedium, color = MutantColors.TextSecondary) }
             }
             (0 until (first + days + 6) / 7).forEach { row ->
                 Row(Modifier.fillMaxWidth()) {
@@ -54,7 +54,7 @@ internal fun HistoryCalendar(workouts: List<HistoryWorkout>, onOpen: (Long) -> U
                         if (day !in 1..days) Spacer(Modifier.weight(1f).aspectRatio(1f)) else {
                             val date = "$monthKey-${day.toString().padStart(2, '0')}"
                             val count = byDate[date]?.size ?: 0
-                            Surface(onClick = { selected = date }, modifier = Modifier.weight(1f).aspectRatio(1f).padding(MutantSpacing.xxs).testTag("history_day_$date").semantics { contentDescription = "$day, ${historyDate(month.timeInMillis, "MMMM yyyy")}, $count treinos${if (date == today) ", hoje" else ""}${if (date == selected) ", selecionado" else ""}" }, shape = MutantShapeTokens.SmallControl, color = when { date == selected -> MutantColors.PrimaryContainer; count > 0 -> MutantColors.SurfaceContainerHigh; else -> MutantColors.Background }, border = if (date == today) BorderStroke(MutantStrokeWidths.Standard, MutantColors.Primary) else null) {
+                            Surface(onClick = { selected = date }, modifier = Modifier.weight(1f).aspectRatio(1f).padding(MutantSpacing.xxs).testTag("history_day_$date").semantics { contentDescription = "$day, ${historyDate(month.timeInMillis, "MMMM yyyy")}, $count workouts${if (date == today) ", today" else ""}${if (date == selected) ", selected" else ""}" }, shape = MutantShapeTokens.SmallControl, color = when { date == selected -> MutantColors.PrimaryContainer; count > 0 -> MutantColors.SurfaceContainerHigh; else -> MutantColors.Background }, border = if (date == today) BorderStroke(MutantStrokeWidths.Standard, MutantColors.Primary) else null) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                                     Text(day.toString(), style = MaterialTheme.typography.bodyMedium)
                                     if (count > 0) Text("•", color = MutantColors.Primary, style = MaterialTheme.typography.labelSmall)
@@ -64,11 +64,11 @@ internal fun HistoryCalendar(workouts: List<HistoryWorkout>, onOpen: (Long) -> U
                     }
                 }
             }
-            Text("• Dia com treino · Contorno: hoje", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
+            Text("• Training day · Outline: today", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
         }
         item {
             Text(historyDate(SimpleHistoryDate.parse(selected), "d 'de' MMMM 'de' yyyy"), style = MaterialTheme.typography.titleMedium)
-            if (selectedSessions.isEmpty()) HistoryEmpty("Nenhum treino neste dia.", "Selecione um dia marcado para abrir as sessões.")
+            if (selectedSessions.isEmpty()) HistoryEmpty("No workout on this day.", "Pick a marked day to open its sessions.")
         }
         items(selectedSessions, key = { it.session.id }) { workout -> HistorySessionCard(workout) { onOpen(workout.session.id) } }
     }
