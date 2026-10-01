@@ -37,6 +37,10 @@ import com.example.data.model.*
 import com.example.R
 import com.example.ui.components.ReadinessDialog
 import com.example.ui.components.SettingsDataDialog
+import com.example.ui.components.GymPickerSheet
+import com.example.ui.components.gymTag
+import com.example.ui.designsystem.MutantColors
+import com.example.ui.designsystem.components.LocalMutantToast
 import com.example.ui.designsystem.components.MutantTopBar
 import com.example.ui.designsystem.components.MutantPrimaryButton
 import com.example.ui.designsystem.components.MutantCard
@@ -48,7 +52,8 @@ import com.example.ui.viewmodel.MutantViewModel
 fun HomeScreen(
     viewModel: MutantViewModel,
     onNavigateToActiveWorkout: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToHistory: () -> Unit = {}
 ) {
     val isStarting by viewModel.isStartingWorkout.collectAsState()
     val isAdoptingTemplate by viewModel.isAdoptingTemplate.collectAsState()
@@ -77,6 +82,11 @@ fun HomeScreen(
     val recommendedProgramDay = programDays.find { it.id == systemStatus.recommendedProgramDayId }
         ?: programDays.firstOrNull { !it.isRestDay }
 
+    val finishedWorkouts by viewModel.finishedWorkouts.collectAsState(initial = emptyList())
+    val daySummaries by viewModel.programDaySummaries.collectAsState()
+    val toast = LocalMutantToast.current
+    val nowMillis = System.currentTimeMillis()
+
     if (showSettingsDialog) {
         SettingsDataDialog(
             viewModel = viewModel,
@@ -86,6 +96,7 @@ fun HomeScreen(
 
     if (showReadinessDialog && selectedDayToStart != null) {
         ReadinessDialog(
+            workoutTitle = selectedDayToStart!!.title,
             onDismiss = { showReadinessDialog = false },
             onConfirm = { readinessInput ->
                 showReadinessDialog = false
@@ -94,519 +105,103 @@ fun HomeScreen(
         )
     }
 
+    if (showGymPicker) {
+        GymPickerSheet(
+            gyms = allGyms,
+            selectedGymId = selectedGym?.id,
+            onSelect = { gym ->
+                viewModel.selectGym(gym)
+                showGymPicker = false
+                toast.show("Gym: ${gym.name}")
+            },
+            onDismiss = { showGymPicker = false }
+        )
+    }
+
+    val selectedGymIndex = allGyms.indexOfFirst { it.id == selectedGym?.id }.coerceAtLeast(0)
+    val weekRows = buildWeekRows(programDays, finishedWorkouts, recommendedProgramDay?.id, nowMillis)
+    val openDay: (ProgramDay) -> Unit = { day ->
+        val row = weekRows.firstOrNull { it.day.id == day.id }
+        when {
+            row?.status == WeekDayStatus.DONE -> onNavigateToHistory()
+            activeSession != null -> onNavigateToActiveWorkout()
+            else -> {
+                selectedDayToStart = day
+                showReadinessDialog = true
+            }
+        }
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(MutantBlack)
-            .padding(horizontal = MutantSpacing.md),
-        contentPadding = PaddingValues(top = MutantSpacing.md, bottom = MutantSpacing.xl),
-        verticalArrangement = Arrangement.spacedBy(MutantSpacing.md)
+            .background(MutantColors.Background),
+        contentPadding = PaddingValues(top = 4.dp, bottom = 28.dp)
     ) {
-        if (isStarting) {
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CircularProgressIndicator(Modifier.size(24.dp))
-                    Text("Starting workout...", color = MaterialTheme.colorScheme.onSurface)
-                }
-            }
-        }
-        startError?.let { message ->
-            item { Text(message, color = MaterialTheme.colorScheme.error) }
-        }
-        // App Header & OS Identifier
-        item {
+        item(key = "top_bar") {
             MutantTopBar(
                 gymName = selectedGym?.name,
+                gymTag = gymTag(selectedGymIndex),
                 onGymClick = { showGymPicker = true },
-                onSettingsClick = { showSettingsDialog = true }
+                onSettingsClick = { showSettingsDialog = true },
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 18.dp)
             )
         }
-        // --- FIRST-RUN STATE: No Active Program ---
         if (programDays.isEmpty()) {
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("empty_program_card"),
-                    shape = MutantShapeTokens.LargePanel,
-                    colors = CardDefaults.cardColors(containerColor = MutantSurface),
-                    border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantBorder)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(MutantSpacing.lgMd),
-                        verticalArrangement = Arrangement.spacedBy(MutantSpacing.md)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "MUTANT LOG",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MutantVolt,
-                                    letterSpacing = MutantTracking.Brand
-                                )
-                            )
-                            Surface(
-                                color = MutantDarkNavy,
-                                shape = MutantShapeTokens.SmallControl,
-                                border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantBorder)
-                            ) {
-                                Text(
-                                    text = "FRESH INSTALL",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = MutantCyan,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    modifier = Modifier.padding(horizontal = MutantSpacing.xs, vertical = MutantSpacing.badgeInset)
-                                )
-                            }
-                        }
-
-                        Text(
-                            text = "No active program",
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MutantTextPrimary
-                            )
-                        )
-
-                        Text(
-                            text = "The canonical reference catalog is preloaded with zero fabricated user history. Start fresh by creating your protocol or loading the Nick Walker reconstruction template.",
-                            style = MaterialTheme.typography.bodyMedium.copy(color = MutantTextSecondary)
-                        )
-
-                        HorizontalDivider(color = MutantBorder.copy(alpha = 0.6f))
-
-                        // Catalog Metrics Grid
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(MutantSpacing.sm)
-                        ) {
-                            Surface(
-                                modifier = Modifier.weight(1f),
-                                shape = MutantShapeTokens.InputChip,
-                                color = MutantDarkNavy,
-                                border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantBorder)
-                            ) {
-                                Column(modifier = Modifier.padding(MutantSpacing.mdPlus)) {
-                                    Text(
-                                        text = "Exercise library",
-                                        style = MaterialTheme.typography.labelSmall.copy(color = MutantTextSecondary)
-                                    )
-                                    Spacer(modifier = Modifier.height(MutantSpacing.xxs))
-                                    Text(
-                                        text = "${libraryCounts.exerciseCount} exercises",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.Black,
-                                            color = MutantTextPrimary
-                                        )
-                                    )
-                                    Text(
-                                        text = "available",
-                                        style = MaterialTheme.typography.labelSmall.copy(color = MutantTextMuted)
-                                    )
-                                }
-                            }
-
-                            Surface(
-                                modifier = Modifier.weight(1f),
-                                shape = MutantShapeTokens.InputChip,
-                                color = MutantDarkNavy,
-                                border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantBorder)
-                            ) {
-                                Column(modifier = Modifier.padding(MutantSpacing.mdPlus)) {
-                                    Text(
-                                        text = "Machine catalog",
-                                        style = MaterialTheme.typography.labelSmall.copy(color = MutantTextSecondary)
-                                    )
-                                    Spacer(modifier = Modifier.height(MutantSpacing.xxs))
-                                    Text(
-                                        text = "${libraryCounts.variantCount} variants",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.Black,
-                                            color = MutantVolt
-                                        )
-                                    )
-                                    Text(
-                                        text = "${libraryCounts.machineCount} machines",
-                                        style = MaterialTheme.typography.labelSmall.copy(color = MutantTextMuted)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Action Buttons
-                        Button(
-                            onClick = { showCreateProgramDialog = true },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .testTag("create_program_button"),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MutantVolt,
-                                contentColor = MutantOnVolt
-                            ),
-                            shape = MutantShapeTokens.CompactControl
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(MutantSpacing.xs))
-                            Text(
-                                text = "CREATE PROGRAM",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = MutantTracking.Compact
-                                )
-                            )
-                        }
-
-                        OutlinedButton(
-                            onClick = { viewModel.adoptNickWalkerTemplate() },
-                            enabled = !isAdoptingTemplate,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .testTag("use_nick_walker_template_button"),
-                            shape = MutantShapeTokens.CompactControl,
-                            border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantVolt.copy(alpha = 0.6f)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MutantVolt)
-                        ) {
-                            if (isAdoptingTemplate) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MutantVolt
-                                )
-                                Spacer(modifier = Modifier.width(MutantSpacing.xs))
-                                Text("CARREGANDO TEMPLATE...", fontWeight = FontWeight.Bold)
-                            } else {
-                                Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(MutantSpacing.xs))
-                                Text("USE NICK WALKER TEMPLATE", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
+            item(key = "empty_program") {
+                EmptyProgramCard(
+                    exerciseCount = libraryCounts.exerciseCount,
+                    variantCount = libraryCounts.variantCount,
+                    machineCount = libraryCounts.machineCount,
+                    isAdoptingTemplate = isAdoptingTemplate,
+                    onCreateProgram = { showCreateProgramDialog = true },
+                    onUseTemplate = { viewModel.adoptNickWalkerTemplate() },
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
             }
         } else {
-            // Next workout, derived from completed routine history before weekday.
-            item {
-                val statusColor = if (systemStatus.fatigueStatus == "Normal") MutantEmerald else MutantAmber
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("daily_status_card"),
-                    shape = MutantShapeTokens.LargePanel,
-                    colors = CardDefaults.cardColors(containerColor = MutantBlack)
-                ) {
-                    Box(modifier = Modifier.fillMaxWidth().heightIn(min = 248.dp)) {
-                        Image(
-                            painter = painterResource(R.drawable.mutant_workout_hero),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.matchParentSize()
-                        )
-                        Box(
-                            modifier = Modifier.matchParentSize().background(
-                                Brush.horizontalGradient(
-                                    0f to MutantBlack.copy(alpha = 0.82f),
-                                    0.48f to MutantBlack.copy(alpha = 0.58f),
-                                    1f to MutantBlack.copy(alpha = 0.12f)
-                                )
-                            )
-                        )
-                        Box(
-                            modifier = Modifier.matchParentSize().background(
-                                Brush.verticalGradient(
-                                    0f to Color.Transparent,
-                                    1f to MutantBlack.copy(alpha = 0.40f)
-                                )
-                            )
-                        )
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(MutantSpacing.lg),
-                            verticalArrangement = Arrangement.spacedBy(MutantSpacing.xs)
-                        ) {
-                            Text(
-                                text = "PRÓXIMO TREINO",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MutantTextSecondary,
-                                    letterSpacing = MutantTracking.Section
-                                )
-                            )
-                            Text(
-                                text = systemStatus.todayWorkoutTitle,
-                                style = MaterialTheme.typography.headlineLarge.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MutantTextPrimary
-                                )
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier.size(9.dp).clip(CircleShape).background(
-                                        statusColor
-                                    )
-                                )
-                                Spacer(modifier = Modifier.width(MutantSpacing.xs))
-                                Text(
-                                    text = if (systemStatus.fatigueStatus == "Normal") {
-                                        "${systemStatus.todayDayCode} · sequência da rotina"
-                                    } else {
-                                        systemStatus.fatigueStatus
-                                    },
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = statusColor
-                                    )
-                                )
-                            }
-                            Text(
-                                text = "Último treino: ${systemStatus.lastSessionTitle}",
-                                style = MaterialTheme.typography.bodyMedium.copy(color = MutantTextSecondary)
-                            )
-                            if (activeSession == null && recommendedProgramDay != null) {
-                                Spacer(modifier = Modifier.height(MutantSpacing.xs))
-                                MutantPrimaryButton(
-                                    text = "START WORKOUT",
-                                    onClick = {
-                                        selectedDayToStart = recommendedProgramDay
-                                        showReadinessDialog = true
-                                    },
-                                    modifier = Modifier.width(260.dp).testTag("start_workout_button"),
-                                    height = 52.dp,
-                                    icon = Icons.Default.PlayArrow,
-                                    testTag = "start_workout_button"
-                                )
-                            }
-                        }
-                    }
-                }
+            item(key = "next_card") {
+                val totalSets = activeUiState.exercises.sumOf { it.exercise.defaultWorkSets }
+                val doneSets = activeUiState.exercises.sumOf { detail -> detail.sets.count { it.setType == SetType.WORK } }
+                NextWorkoutCard(
+                    todayLabel = todayLabel(nowMillis),
+                    title = activeSession?.title ?: recommendedProgramDay?.title ?: systemStatus.todayWorkoutTitle,
+                    summary = if (activeSession == null) recommendedProgramDay?.let { daySummaries[it.id] } else null,
+                    isRecovered = systemStatus.fatigueStatus == "Normal" || systemStatus.fatigueStatus == "Fully recovered",
+                    fatigueLabel = systemStatus.fatigueStatus,
+                    lastTitle = systemStatus.lastWorkoutTitle,
+                    lastDaysAgo = systemStatus.lastWorkoutDaysAgo,
+                    recoveryText = systemStatus.recoveryDaysText,
+                    activeSession = activeSession?.let {
+                        ActiveSessionProgress(it.title, activeUiState.elapsedSeconds, doneSets, totalSets)
+                    },
+                    isStarting = isStarting,
+                    startError = startError,
+                    onStart = recommendedProgramDay?.let { day -> { openDay(day) } },
+                    onResume = onNavigateToActiveWorkout,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
             }
-        // Active Session Takeover Banner if in progress
-        if (activeSession != null) {
-            item {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onNavigateToActiveWorkout() }
-                        .testTag("resume_workout_banner"),
-                    shape = MutantShapeTokens.Panel,
-                    color = MutantSurfaceCard,
-                    border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Emphasized, MutantVolt)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(MutantSpacing.lgCompact),
-                        verticalArrangement = Arrangement.spacedBy(MutantSpacing.compactMd)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .clip(CircleShape)
-                                        .background(MutantVolt)
-                                )
-                                Spacer(modifier = Modifier.width(MutantSpacing.xs))
-                                Text(
-                                    text = "SESSION IN PROGRESS",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Black,
-                                        color = MutantVolt,
-                                        letterSpacing = MutantTracking.Label
-                                    )
-                                )
-                            }
-
-                            val completedCount = activeUiState.exercises.count { exDetail ->
-                                exDetail.sets.any { s -> s.setType == SetType.WORK }
-                            }
-                            val totalCount = activeUiState.exercises.size
-                            Text(
-                                text = if (totalCount > 0) "$completedCount / $totalCount exercises" else "Active",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = MutantTextSecondary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            )
-                        }
-
-                        Text(
-                            text = activeSession?.title ?: "Workout",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Black,
-                                color = MutantTextPrimary
-                            )
-                        )
-
-                        Button(
-                            onClick = onNavigateToActiveWorkout,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .testTag("resume_workout_button"),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MutantVolt,
-                                contentColor = MutantOnVolt
-                            ),
-                            shape = MutantShapeTokens.CompactControl
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = MutantOnVolt)
-                            Spacer(modifier = Modifier.width(MutantSpacing.xs))
-                            Text(
-                                text = "RESUME SESSION",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = MutantTracking.Compact
-                                )
-                            )
-                        }
-                    }
-                }
+            item(key = "week_header") {
+                WeekHeader(
+                    sessions = programDays.count { !it.isRestDay },
+                    restDays = programDays.count { it.isRestDay },
+                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 12.dp)
+                )
+            }
+            items(weekRows, key = { it.day.id }) { row ->
+                WeekDayItem(
+                    row = row,
+                    summary = daySummaries[row.day.id],
+                    onOpen = { openDay(row.day) },
+                    onAddExercise = {
+                        targetProgramDayId = row.day.id
+                        showAddExerciseDialog = true
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
             }
         }
-
-            // Program Structure Header & Add Exercise
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "THIS WEEK",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MutantTextSecondary,
-                            letterSpacing = MutantTracking.Section
-                        )
-                    )
-                    TextButton(
-                        onClick = {
-                            targetProgramDayId = recommendedProgramDay?.id ?: programDays.firstOrNull()?.id
-                            showAddExerciseDialog = true
-                        }
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = MutantVolt)
-                        Spacer(modifier = Modifier.width(MutantSpacing.xxs))
-                        Text("ADD EXERCISE", color = MutantVolt, fontWeight = FontWeight.Bold, fontSize = MutantTypeScale.compact)
-                    }
-                }
-            }
-
-            // Weekly Days List
-            items(programDays) { day ->
-                val isNext = day.id == recommendedProgramDay?.id
-                val rowMarker = when {
-                    isNext -> Modifier.background(MaterialTheme.colorScheme.primary, CircleShape)
-                    day.isRestDay -> Modifier.background(MutantTextMuted.copy(alpha = 0.58f), CircleShape)
-                    else -> Modifier.border(2.dp, MutantBorder, CircleShape)
-                }
-                Column {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = !day.isRestDay && activeSession == null) {
-                                selectedDayToStart = day
-                                showReadinessDialog = true
-                            }
-                            .testTag("program_day_${day.dayIndex}"),
-                        shape = MutantShapeTokens.InputChip,
-                        color = if (isNext) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f) else Color.Transparent
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = MutantSpacing.sm, vertical = MutantSpacing.xs),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(MutantSpacing.xs)
-                        ) {
-                            Text(
-                                text = day.dayCode,
-                                modifier = Modifier.width(34.dp),
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (isNext) MutantVolt else MutantTextMuted
-                                )
-                            )
-                            Box(modifier = Modifier.size(12.dp).then(rowMarker))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = day.title,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = if (isNext) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (day.isRestDay) MutantTextMuted else MutantTextPrimary
-                                    )
-                                )
-                                if (isNext || day.isRestDay) {
-                                    Text(
-                                        text = if (isNext) "Próximo treino" else "Rest",
-                                        style = MaterialTheme.typography.labelSmall.copy(color = MutantTextSecondary)
-                                    )
-                                }
-                            }
-                            if (!day.isRestDay && activeSession == null) {
-                                IconButton(
-                                    onClick = {
-                                        targetProgramDayId = day.id
-                                        showAddExerciseDialog = true
-                                    },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(Icons.Default.Add, contentDescription = "Add exercise to ${day.title}", tint = MutantTextMuted)
-                                }
-                            }
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MutantTextMuted)
-                        }
-                    }
-                    if (day != programDays.lastOrNull()) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = MutantSpacing.weekDividerIndent),
-                            color = MutantBorder.copy(alpha = 0.38f)
-                        )
-                    }
-                }
-            }
-
-            item {
-                MutantCard(
-                    variant = MutantCardVariant.CONTAINER_LOW,
-                    contentPadding = MutantSpacing.md
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(MutantSpacing.sm)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FitnessCenter,
-                            contentDescription = null,
-                            tint = MutantVolt,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Last workout", style = MaterialTheme.typography.labelSmall.copy(color = MutantTextSecondary))
-                            Text(systemStatus.lastSessionTitle, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = MutantTextPrimary))
-                        }
-                        VerticalDivider(modifier = Modifier.height(48.dp), color = MutantBorder)
-                        Icon(
-                            imageVector = Icons.Default.FavoriteBorder,
-                            contentDescription = null,
-                            tint = MutantVolt,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Recovery", style = MaterialTheme.typography.labelSmall.copy(color = MutantTextSecondary))
-                            Text(systemStatus.recoveryDaysText, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = MutantEmerald))
-                            Text(systemStatus.fatigueStatus, style = MaterialTheme.typography.labelSmall.copy(color = MutantTextMuted))
-                        }
-                    }
-                }
-            }        }
     }
 
     // --- DIALOG: ADD EXERCISE (Search [incline] -> Muscle -> Exercise -> Available variants -> [ADD] / [CREATE CUSTOM VARIANT]) ---
@@ -1013,63 +608,6 @@ fun HomeScreen(
             dismissButton = {
                 TextButton(onClick = { showCreateProgramDialog = false }) {
                     Text("Cancel", color = MutantTextSecondary)
-                }
-            },
-            containerColor = MutantSurfaceCard
-        )
-    }
-
-    // Gym Picker Dialog
-    if (showGymPicker) {
-        AlertDialog(
-            onDismissRequest = { showGymPicker = false },
-            title = {
-                Text(
-                    text = "SELECT GYM FACILITY",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MutantVolt)
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(MutantSpacing.xs)) {
-                    allGyms.forEach { gym ->
-                        val isSelected = selectedGym?.id == gym.id
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.selectGym(gym)
-                                    showGymPicker = false
-                                },
-                            shape = MutantShapeTokens.TinyControl,
-                            color = if (isSelected) MutantVolt.copy(alpha = 0.2f) else MutantDarkNavy,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (isSelected) MutantVolt else MutantBorder
-                            )
-                        ) {
-                            Column(modifier = Modifier.padding(MutantSpacing.sm)) {
-                                Text(
-                                    text = gym.name,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) MutantVolt else MutantTextPrimary
-                                    )
-                                )
-                                if (gym.notes.isNotEmpty()) {
-                                    Text(
-                                        text = gym.notes,
-                                        style = MaterialTheme.typography.labelSmall.copy(color = MutantTextSecondary)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showGymPicker = false }) {
-                    Text("Close", color = MutantTextSecondary)
                 }
             },
             containerColor = MutantSurfaceCard

@@ -19,7 +19,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.*
 import com.example.ui.designsystem.*
-import com.example.ui.designsystem.components.MutantCard
+import com.example.ui.designsystem.components.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import com.example.ui.viewmodel.HistoryUiState
 import com.example.ui.viewmodel.MutantViewModel
 import java.text.NumberFormat
@@ -113,25 +126,18 @@ internal fun HistoryContent(
                     onSession = { sessionId = it }
                 )
                 is HistoryView.Main -> Column(Modifier.fillMaxSize().testTag("history_screen")) {
-                    HistoryHeader("Histórico", onNavigateBack)
-                    TabRow(selectedTabIndex = mode) {
-                        listOf("Treinos", "Exercícios", "Calendário").forEachIndexed { index, title ->
-                            Tab(
-                                selected = mode == index,
-                                onClick = { mode = index },
-                                text = { Text(title) },
-                                modifier = Modifier.testTag("history_tab_$index")
-                            )
-                        }
+                    Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text("History", style = MutantType.ScreenTitle, color = MutantColors.TextPrimary)
+                        HistorySegments(listOf("Workouts", "Exercises", "Calendar"), mode) { mode = it }
                     }
                     when {
                         state.loading -> com.example.ui.designsystem.components.MutantLoadingScreen(
-                            message = "Carregando histórico de treinos...",
+                            message = "Loading history…",
                             modifier = Modifier.fillMaxSize().testTag("history_loading")
                         )
                         state.error != null -> Column(Modifier.padding(MutantSpacing.lg)) {
                             Text(state.error, color = MutantColors.Error)
-                            TextButton(onClick = onRetry) { Text("Tentar novamente") }
+                            TextButton(onClick = onRetry) { Text("Try again") }
                         }
                         else -> androidx.compose.animation.AnimatedContent(
                             targetState = mode,
@@ -154,7 +160,7 @@ internal fun HistoryContent(
 @Composable
 internal fun HistoryHeader(title: String, onBack: () -> Unit, action: (@Composable () -> Unit)? = null) {
     Row(Modifier.fillMaxWidth().padding(end = MutantSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar") }
+        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
         Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         action?.invoke()
     }
@@ -182,81 +188,138 @@ private fun HistoryTimeline(workouts: List<HistoryWorkout>, onOpen: (Long) -> Un
     val groups = visible.groupBy { workout ->
         val date = historyDate(workout.session.startedAt, "yyyy-MM-dd")
         when {
-            date == historyDate(now.timeInMillis, "yyyy-MM-dd") -> "HOJE"
-            date == historyDate((now.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }.timeInMillis, "yyyy-MM-dd") -> "ONTEM"
-            workout.session.startedAt >= weekStart && workout.session.startedAt <= now.timeInMillis -> "ESTA SEMANA"
+            date == historyDate(now.timeInMillis, "yyyy-MM-dd") -> "TODAY"
+            date == historyDate((now.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }.timeInMillis, "yyyy-MM-dd") -> "YESTERDAY"
+            workout.session.startedAt >= weekStart && workout.session.startedAt <= now.timeInMillis -> "THIS WEEK"
             else -> historyDate(workout.session.startedAt, "MMMM yyyy").uppercase(historyLocale)
         }
     }
-    LazyColumn(Modifier.fillMaxSize().testTag("history_timeline"), contentPadding = PaddingValues(MutantSpacing.md), verticalArrangement = Arrangement.spacedBy(MutantSpacing.sm)) {
-        item { HistorySearch(query, { query = it }, "Buscar no histórico", "history_search") }
+    LazyColumn(Modifier.fillMaxSize().testTag("history_timeline"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { HistorySearch(query, { query = it }, "Search workouts", "history_search") }
         item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(MutantSpacing.xs)) {
-                item { FilterChip(selected = selectedTypes.isEmpty() && days == 0 && !prs, onClick = { types = arrayListOf(); days = 0; prs = false }, label = { Text("Todos") }) }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                item { MutantChoiceChip("All", selectedTypes.isEmpty() && days == 0 && !prs, { types = arrayListOf(); days = 0; prs = false }) }
                 items(recordedTitles, key = { it }) { type ->
-                    FilterChip(selected = type in selectedTypes, onClick = { types = ArrayList(if (type in selectedTypes) selectedTypes - type else selectedTypes + type) }, label = { Text(type) }, modifier = Modifier.testTag("history_filter_$type"))
+                    MutantChoiceChip(type, type in selectedTypes, { types = ArrayList(if (type in selectedTypes) selectedTypes - type else selectedTypes + type) }, modifier = Modifier.testTag("history_filter_$type"))
                 }
-                items(listOf(7, 30)) { count -> FilterChip(selected = days == count, onClick = { days = if (days == count) 0 else count }, label = { Text("$count dias") }) }
-                item { FilterChip(selected = prs, onClick = { prs = !prs }, label = { Text("PRs") }) }
+                items(listOf(7, 30)) { count -> MutantChoiceChip("$count days", days == count, { days = if (days == count) 0 else count }) }
+                item { MutantChoiceChip("PRs only", prs, { prs = !prs }) }
             }
         }
         item {
-            if (searching) Text("RESULTADOS DA BUSCA E FILTROS", style = MaterialTheme.typography.labelLarge, color = MutantColors.TextSecondary)
-            else HistoryMonthSelector(month, { monthOffset-- }, { monthOffset++ }, monthOffset < 0)
-            HistoryMetrics(listOf("Treinos" to visible.size.toString(), "Duração" to historyDuration(visible.sumOf { it.minutes }), "Séries" to visible.sumOf { it.sets.size }.toString(), "Volume" to "${historyNumber(visible.sumOf { it.volume })} kg"))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (searching) MutantEyebrow("SEARCH RESULTS", style = MutantType.Eyebrow.copy(fontSize = 10.5.sp, letterSpacing = 0.1.em))
+                else HistoryMonthSelector(month, { monthOffset-- }, { monthOffset++ }, monthOffset < 0)
+                HistoryMetrics(listOf("WORKOUTS" to visible.size.toString(), "TIME" to historyDuration(visible.sumOf { it.minutes }), "SETS" to visible.sumOf { it.sets.size }.toString(), "VOLUME" to "${historyNumber(visible.sumOf { it.volume })} kg"))
+            }
         }
-        if (visible.isEmpty()) item { HistoryEmpty(if (workouts.isEmpty()) "Seu histórico começa no próximo treino." else if (searching) "Nenhum treino corresponde aos filtros." else "Nenhum treino neste mês.", if (workouts.isEmpty()) "Conclua uma sessão para acompanhar sua evolução aqui." else if (searching) "Altere a busca ou os filtros para ver outros treinos." else "Navegue pelos meses para encontrar sessões anteriores.") }
+        if (visible.isEmpty()) item { HistoryEmpty(if (workouts.isEmpty()) "Your history starts with your next workout." else if (searching) "No workouts match these filters." else "No workouts this month.", if (workouts.isEmpty()) "Finish a session to track your progress here." else if (searching) "Change the search or filters to see other workouts." else "Go back a month to find earlier sessions.") }
         groups.forEach { (label, sessions) ->
-            item(key = "group-$label") { Text(label, style = MaterialTheme.typography.labelLarge, color = MutantColors.TextSecondary, modifier = Modifier.padding(top = MutantSpacing.sm)) }
+            item(key = "group-$label") { MutantEyebrow(label, modifier = Modifier.padding(start = 4.dp, top = 10.dp), style = MutantType.Eyebrow.copy(fontSize = 10.5.sp, letterSpacing = 0.1.em)) }
             items(sessions, key = { it.session.id }) { HistorySessionCard(it) { onOpen(it.session.id) } }
         }
         if (!searching && workouts.any { historyDate(it.session.startedAt, "yyyy-MM") < historyDate(month.timeInMillis, "yyyy-MM") }) item {
-            OutlinedButton(onClick = { monthOffset-- }, modifier = Modifier.fillMaxWidth().testTag("history_older")) { Text("Ver mês anterior") }
+            MutantButton("Previous month", onClick = { monthOffset-- }, style = MutantButtonStyle.Surface, height = 48.dp,
+                textStyle = MutantType.ButtonSmall, modifier = Modifier.fillMaxWidth().testTag("history_older"))
+        }
+    }
+}
+
+@Composable
+internal fun HistorySegments(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(MutantColors.SurfaceContainer, RoundedCornerShape(14.dp))
+            .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(14.dp))
+            .padding(4.dp)
+    ) {
+        labels.forEachIndexed { index, label ->
+            val on = index == selected
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(36.dp)
+                    .background(if (on) MutantColors.Line else Color.Transparent, RoundedCornerShape(10.dp))
+                    .selectable(on, role = Role.Tab) { onSelect(index) }
+                    .testTag("history_tab_$index"),
+                contentAlignment = Alignment.Center
+            ) { Text(label, style = MutantType.ButtonSmall, color = if (on) MutantColors.TextPrimary else MutantColors.TextSecondary) }
         }
     }
 }
 
 @Composable
 internal fun HistorySessionCard(workout: HistoryWorkout, onOpen: () -> Unit) {
-    MutantCard(onClick = onOpen, testTag = "history_session_${workout.session.id}") {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.FitnessCenter, null, tint = MutantColors.Primary)
-            Spacer(Modifier.width(MutantSpacing.sm))
-            Column(Modifier.weight(1f)) {
-                Text(workout.session.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("${historyDate(workout.session.startedAt, "dd/MM/yyyy · HH:mm")} · ${historyDuration(workout.minutes)}", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
+    Surface(
+        onClick = onOpen,
+        shape = RoundedCornerShape(18.dp),
+        color = MutantColors.SurfaceContainer,
+        border = BorderStroke(1.dp, MutantColors.OutlineVariant),
+        modifier = Modifier.fillMaxWidth().testTag("history_session_${workout.session.id}")
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(workout.session.title, style = MutantType.Title, color = MutantColors.TextPrimary)
+                    Text("${historyDate(workout.session.startedAt, "EEE MMM d")} · ${historyDuration(workout.minutes)}",
+                        style = MutantType.Caption, color = MutantColors.TextSecondary)
+                }
+                if (workout.prs > 0) HistoryPrBadge(workout.prs)
             }
-            if (workout.prs > 0) HistoryPrBadge(workout.prs)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HistoryCell("EXER.", "${workout.exercises.size}", Modifier.weight(1f))
+                HistoryCell("SETS", "${workout.sets.size}", Modifier.weight(1f))
+                HistoryCell("VOLUME", "${historyNumber(workout.volume)} kg", Modifier.weight(1f))
+            }
         }
-        Spacer(Modifier.height(MutantSpacing.sm))
-        Text("${workout.exercises.size} exercícios · ${workout.sets.size} séries · ${historyNumber(workout.volume)} kg", style = MaterialTheme.typography.bodySmall)
-        workout.exercises.take(2).forEach { ex ->
-            Spacer(Modifier.height(MutantSpacing.sm))
-            Text(ex.exercise.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-            Text(ex.workSets.joinToString(" · ") { historySetText(it.set) }.ifEmpty { "Sem séries de trabalho" }, style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
-        }
-        Spacer(Modifier.height(MutantSpacing.xs))
-        Text("Ver treino ›", style = MaterialTheme.typography.labelLarge, color = MutantColors.Primary)
+    }
+}
+
+@Composable
+private fun HistoryCell(label: String, value: String, modifier: Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        MutantEyebrow(label, style = MutantType.Eyebrow.copy(fontSize = 9.5.sp))
+        Text(value, style = MutantType.MonoBody.copy(fontSize = 13.sp), color = MutantColors.TextPrimary, maxLines = 1)
     }
 }
 
 @Composable
 internal fun HistorySearch(value: String, onChange: (String) -> Unit, label: String, tag: String) {
-    OutlinedTextField(value, onChange, placeholder = { Text(label) }, leadingIcon = { Icon(Icons.Default.Search, null) }, trailingIcon = {
-        if (value.isNotEmpty()) IconButton(onClick = { onChange("") }) { Icon(Icons.Default.Close, "Limpar busca") }
-    }, singleLine = true, shape = MutantShapeTokens.CompactControl, modifier = Modifier.fillMaxWidth().testTag(tag))
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .background(MutantColors.SurfaceContainer, RoundedCornerShape(14.dp))
+            .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(14.dp))
+            .padding(start = 14.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(Icons.Outlined.Search, contentDescription = null, tint = MutantColors.TextMetadata, modifier = Modifier.size(20.dp))
+        BasicTextField(
+            value = value, onValueChange = onChange, singleLine = true,
+            textStyle = MutantType.Body.copy(color = MutantColors.TextPrimary),
+            cursorBrush = SolidColor(MutantColors.Primary),
+            modifier = Modifier.weight(1f).testTag(tag),
+            decorationBox = { inner ->
+                if (value.isEmpty()) Text(label, style = MutantType.Body, color = MutantColors.TextMetadata)
+                inner()
+            }
+        )
+        if (value.isNotEmpty()) IconButton(onClick = { onChange("") }, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Default.Close, "Clear search", tint = MutantColors.TextSecondary, modifier = Modifier.size(18.dp))
+        }
+    }
 }
 
 @Composable
 internal fun HistoryMetrics(metrics: List<Pair<String, String>>) {
-    Column(verticalArrangement = Arrangement.spacedBy(MutantSpacing.xs)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         metrics.chunked(2).forEach { pair ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MutantSpacing.sm)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 pair.forEach { (label, value) ->
-                    Column(Modifier.weight(1f).padding(vertical = MutantSpacing.xs)) {
-                        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(label, style = MaterialTheme.typography.labelMedium, color = MutantColors.TextSecondary)
-                    }
+                    MutantStatWell(label.uppercase(Locale.ROOT), value, Modifier.weight(1f))
                 }
             }
         }
@@ -265,21 +328,23 @@ internal fun HistoryMetrics(metrics: List<Pair<String, String>>) {
 
 @Composable
 internal fun HistoryPrBadge(count: Int) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.EmojiEvents, null, tint = MutantColors.Warning, modifier = Modifier.size(MutantSpacing.md))
-        Text(" $count PR${if (count == 1) "" else "s"}", color = MutantColors.Warning, style = MaterialTheme.typography.labelMedium)
-    }
+    Text(
+        "$count PR${if (count == 1) "" else "s"}",
+        style = MutantType.MonoLabel.copy(fontWeight = FontWeight.Bold),
+        color = MutantColors.Warning,
+        modifier = Modifier.background(MutantColors.Warning.copy(alpha = 0.14f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 5.dp)
+    )
 }
 
 @Composable
 internal fun HistoryEmpty(title: String, description: String) {
-    Column(Modifier.fillMaxWidth().padding(vertical = MutantSpacing.xl), verticalArrangement = Arrangement.spacedBy(MutantSpacing.xs)) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        Text(description, style = MaterialTheme.typography.bodyMedium, color = MutantColors.TextSecondary)
+    Column(Modifier.fillMaxWidth().padding(vertical = MutantSpacing.xl), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MutantType.Title, color = MutantColors.TextPrimary)
+        Text(description, style = MutantType.BodySmall, color = MutantColors.TextSecondary)
     }
 }
 
-internal val historyLocale = Locale.forLanguageTag("pt-BR")
+internal val historyLocale: Locale = Locale.US
 internal fun historyDate(timestamp: Long, pattern: String): String = SimpleDateFormat(pattern, historyLocale).format(Date(timestamp))
 internal fun historyNumber(value: Number): String = NumberFormat.getNumberInstance(historyLocale).apply { maximumFractionDigits = 1 }.format(value)
 internal fun historySetText(set: WorkoutSet): String = "${historyNumber(set.weightKg)} × ${set.reps}"

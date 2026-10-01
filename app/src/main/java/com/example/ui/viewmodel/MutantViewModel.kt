@@ -44,7 +44,9 @@ data class SystemStatus(
     val nextScheduledTitle: String = "Create program to schedule",
     val recommendedProgramDayId: Long? = null,
     val recommendationBasis: RecommendationBasis = RecommendationBasis.UNAVAILABLE,
-    val hasProgram: Boolean = false
+    val hasProgram: Boolean = false,
+    val lastWorkoutTitle: String? = null,
+    val lastWorkoutDaysAgo: Int? = null
 )
 
 data class ActiveWorkoutUiState(
@@ -57,7 +59,9 @@ data class ActiveWorkoutUiState(
     val restTimerRemainingSeconds: Int = 0,
     val isRestTimerRunning: Boolean = false,
     val restTimerCompleted: Boolean = false,
-    val restTimerRecommended: String = "2–3 min"
+    val restTimerRecommended: String = "2–3 min",
+    // Work sets from the last finished session of the current exercise.
+    val previousWorkSets: List<WorkoutSet> = emptyList()
 )
 
 class MutantViewModel(application: Application) : AndroidViewModel(application) {
@@ -81,6 +85,9 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
     val lastFinishedWorkout = repository.lastFinishedWorkout
     val lastFinishedRoutineWorkout = repository.lastFinishedRoutineWorkout
     val cardioSessions = repository.allCardioSessions
+    val programDaySummaries = repository.programDaySummaries
+        .map { rows -> rows.associateBy { it.programDayId } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private val historyReload = MutableStateFlow(0)
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -243,9 +250,14 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     if (session.id == discardedSessionId) return@collect
                     discardedSessionId = null
-                    _activeWorkoutUiState.update { it.copy(session = session, currentExerciseIndex = session.currentExerciseIndex,
-                        isLoading = it.isLoading || it.session?.id != session.id,
-                        exercises = if (it.session?.id == session.id) it.exercises else emptyList()) }
+                    _activeWorkoutUiState.update {
+                        val sameExercise = it.session?.id == session.id && it.currentExerciseIndex == session.currentExerciseIndex
+                        it.copy(session = session, currentExerciseIndex = session.currentExerciseIndex,
+                            isLoading = it.isLoading || it.session?.id != session.id,
+                            exercises = if (it.session?.id == session.id) it.exercises else emptyList(),
+                            currentProgression = if (sameExercise) it.currentProgression else null,
+                            previousWorkSets = if (sameExercise) it.previousWorkSets else emptyList())
+                    }
                     refreshClock()
                     if (notifiedSessionId != session.id) {
                         notifiedSessionId = session.id
@@ -293,18 +305,18 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         val currentEx = currentExDetail.exercise
 
         viewModelScope.launch {
-            val recommendation = ProgressionEngine.computeProgression(
-                lastWorkSets = currentExDetail.sets.filter { it.setType == SetType.WORK },
+            // Double progression reads the last finished session, never the one in progress.
+            val recommendation = repository.getProgressionSuggestion(
+                exerciseId = currentEx.id,
                 repMin = currentEx.defaultRepMin,
                 repMax = currentEx.defaultRepMax,
                 targetRir = currentEx.defaultRir,
-                incrementKg = currentEx.defaultIncrementKg,
-                lastExecutionQuality = currentExDetail.workoutExercise.executionQuality,
-                lastTargetMuscleQuality = currentExDetail.workoutExercise.targetMuscleQuality
+                incrementKg = currentEx.defaultIncrementKg
             )
+            val previous = repository.getPreviousWorkSets(currentEx.id)
             _activeWorkoutUiState.update {
                 if (it.session?.id == state.session?.id && it.currentExerciseIndex == state.currentExerciseIndex) {
-                    it.copy(currentProgression = recommendation)
+                    it.copy(currentProgression = recommendation, previousWorkSets = previous)
                 } else it
             }
         }
@@ -484,6 +496,42 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // --- TODAY-ONLY SESSION EDITS (the program is untouched) ---
+    private var lastRemovedExercise: com.example.data.db.RemovedSessionExercise? = null
+
+    fun addExerciseToSession(exerciseId: Long, afterCurrent: Boolean, onAdded: () -> Unit = {}) {
+        val state = _activeWorkoutUiState.value
+        val session = state.session ?: return
+        val position = if (afterCurrent) state.currentExerciseIndex + 1 else state.exercises.size
+        launchWorkoutMutation {
+            repository.addExerciseToSession(session.id, exerciseId, position)
+            onAdded()
+        }
+    }
+
+    /** [onRemoved] runs on success; an Undo can then call [undoRemoveExercise]. */
+    fun removeExerciseFromSession(workoutExerciseId: Long, onRemoved: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        val session = _activeWorkoutUiState.value.session ?: return
+        launchWorkoutMutation {
+            try {
+                lastRemovedExercise = repository.removeExerciseFromSession(session.id, workoutExerciseId)
+                onRemoved()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onError(e.message ?: "Could not remove the exercise.")
+            }
+        }
+    }
+
+    fun undoRemoveExercise() {
+        val removed = lastRemovedExercise ?: return
+        lastRemovedExercise = null
+        launchWorkoutMutation {
+            if (_activeWorkoutUiState.value.session?.id == removed.sessionId) repository.restoreSessionExercise(removed)
+        }
+    }
+
     fun deleteSet(setId: Long) {
         launchWorkoutMutation {
             repository.deleteSet(setId)
@@ -565,16 +613,16 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         )
         val daysAgo = recommendation.daysSinceLastWorkout
         val recoveryText = when (daysAgo) {
-            null -> "Sem histórico"
-            0 -> "Hoje mesmo"
-            1 -> "1 dia completo"
-            else -> "$daysAgo dias completos"
+            null -> "No history"
+            0 -> "Same day"
+            1 -> "1 day"
+            else -> "$daysAgo days"
         }
 
         val fatigueSignal = when {
-            lastWorkout?.readinessStatus?.contains("fatigue", ignoreCase = true) == true -> "Fadiga detectada"
-            lastWorkout?.jointDiscomfort in listOf("Moderate", "Severe") -> "Cuidado articular"
-            daysAgo != null && daysAgo >= 3 -> "Totalmente recuperado"
+            lastWorkout?.readinessStatus?.contains("fatigue", ignoreCase = true) == true -> "High fatigue"
+            lastWorkout?.jointDiscomfort in listOf("Moderate", "Severe") -> "Joint caution"
+            daysAgo != null && daysAgo >= 3 -> "Fully recovered"
             else -> "Normal"
         }
 
@@ -588,7 +636,9 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
             nextScheduledTitle = recommendation.title,
             recommendedProgramDayId = recommendation.programDayId,
             recommendationBasis = recommendation.basis,
-            hasProgram = true
+            hasProgram = true,
+            lastWorkoutTitle = recommendation.lastWorkoutTitle,
+            lastWorkoutDaysAgo = daysAgo
         )
     }
 
@@ -602,14 +652,15 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
 
     val isExporting = MutableStateFlow(false)
 
+    fun exportFileName(): String = "mutant-log-analysis-${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())}.json"
+
     fun shareExportFile(context: Context, onComplete: (() -> Unit)? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             isExporting.value = true
             try {
                 val exportData = exportRepository.buildExport()
                 val jsonString = jsonSerializer.encodeToString(AnalysisExport.serializer(), exportData)
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-                val fileName = "mutant-log-analysis-${dateFormat.format(Date())}.json"
+                val fileName = exportFileName()
                 val exportFile = File(context.cacheDir, fileName)
                 exportFile.writeText(jsonString)
 

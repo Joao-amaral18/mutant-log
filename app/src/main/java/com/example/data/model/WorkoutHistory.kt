@@ -43,7 +43,7 @@ data class HistoryExerciseSummary(val exercise: Exercise, val performances: List
     }
 }
 
-enum class HistoryExerciseSort(val label: String) { RECENT("Mais recentes"), NAME("Nome"), USED("Mais utilizados"), PROGRESS("Maior progresso") }
+enum class HistoryExerciseSort(val label: String) { RECENT("Most recent"), NAME("Name"), USED("Most used"), PROGRESS("Most progress") }
 
 object WorkoutHistory {
     fun normalize(value: String): String = Normalizer.normalize(value.lowercase(Locale.ROOT), Normalizer.Form.NFD).replace("\\p{M}+".toRegex(), "")

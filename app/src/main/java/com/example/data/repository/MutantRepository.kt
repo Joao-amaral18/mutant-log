@@ -59,6 +59,12 @@ class MutantRepository(private val dao: MutantDao) {
     fun getProgramExercisesForDay(dayId: Long): Flow<List<ProgramExerciseDetail>> =
         dao.getProgramExercisesForDay(dayId)
 
+    val programDaySummaries: Flow<List<ProgramDaySummary>> = dao.observeProgramDaySummaries()
+
+    suspend fun getPreviousWorkSets(exerciseId: Long): List<WorkoutSet> = withContext(Dispatchers.IO) {
+        dao.getLastSessionWorkSetsForExercise(exerciseId).filter { it.setType == SetType.WORK }
+    }
+
     fun getWorkoutExercisesWithDetails(sessionId: Long): Flow<List<WorkoutExerciseDetail>> =
         dao.getWorkoutExercisesWithDetails(sessionId)
 
@@ -331,6 +337,17 @@ class MutantRepository(private val dao: MutantDao) {
         }
 
         setId
+    }
+
+    suspend fun addExerciseToSession(sessionId: Long, exerciseId: Long, position: Int): Long = withContext(Dispatchers.IO) {
+        dao.addExerciseToActiveSession(sessionId, exerciseId, position)
+    }
+
+    suspend fun removeExerciseFromSession(sessionId: Long, workoutExerciseId: Long): RemovedSessionExercise =
+        withContext(Dispatchers.IO) { dao.removeExerciseFromActiveSession(sessionId, workoutExerciseId) }
+
+    suspend fun restoreSessionExercise(removed: RemovedSessionExercise) = withContext(Dispatchers.IO) {
+        dao.restoreRemovedExercise(removed)
     }
 
     suspend fun deleteSet(setId: Long) = withContext(Dispatchers.IO) {

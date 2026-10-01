@@ -15,6 +15,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +33,10 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.designsystem.MutantMotion
 import com.example.ui.designsystem.MutantPalette
 import com.example.ui.designsystem.MutantTypeScale
+import com.example.ui.designsystem.MutantType
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.semantics.Role
 import com.example.ui.screens.*
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.MutantViewModel
@@ -37,12 +46,13 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 enum class NavDestination(
     val title: String,
     val icon: ImageVector,
+    val selectedIcon: ImageVector,
     val testTag: String
 ) {
-    HOME("Protocol", Icons.Default.CalendarToday, "nav_home"),
-    WORKOUT("Session", Icons.Default.FitnessCenter, "nav_workout"),
-    HISTORY("Histórico", Icons.Default.History, "nav_dossier"),
-    CARDIO("Cardio", Icons.Default.DirectionsRun, "nav_cardio")
+    HOME("Protocol", Icons.Outlined.CalendarToday, Icons.Filled.CalendarToday, "nav_home"),
+    WORKOUT("Session", Icons.Outlined.FitnessCenter, Icons.Filled.FitnessCenter, "nav_workout"),
+    HISTORY("History", Icons.Outlined.History, Icons.Filled.History, "nav_dossier"),
+    CARDIO("Cardio", Icons.AutoMirrored.Outlined.DirectionsRun, Icons.AutoMirrored.Filled.DirectionsRun, "nav_cardio")
 }
 
 class MainActivity : ComponentActivity() {
@@ -121,70 +131,20 @@ fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableShar
         }
     }
 
+    val toastState = remember { com.example.ui.designsystem.components.MutantToastState() }
+    CompositionLocalProvider(com.example.ui.designsystem.components.LocalMutantToast provides toastState) {
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MutantBlack,
+        containerColor = MutantPalette.AppBackground,
         bottomBar = {
             val hideBottomNav = currentScreen == NavDestination.WORKOUT && activeSession != null
             if (!hideBottomNav) {
-                NavigationBar(
-                    containerColor = MutantPalette.SurfaceNormal,
-                    tonalElevation = 4.dp,
-                    windowInsets = WindowInsets.navigationBars,
-                    modifier = Modifier.testTag("mutant_bottom_bar")
-                ) {
-                    NavDestination.values().forEach { destination ->
-                        val isSelected = currentScreen == destination
-                        val hasActiveSessionBadge = destination == NavDestination.WORKOUT && activeSession != null
-
-                        NavigationBarItem(
-                            selected = isSelected,
-                            onClick = { currentScreen = destination },
-                            icon = {
-                                BadgedBox(
-                                    badge = {
-                                        if (hasActiveSessionBadge) {
-                                            Badge(
-                                                containerColor = MutantPalette.PrimaryPurple,
-                                                contentColor = MaterialTheme.colorScheme.onPrimary
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(6.dp)
-                                                        .clip(CircleShape)
-                                                        .background(MaterialTheme.colorScheme.onPrimary)
-                                                )
-                                            }
-                                        }
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = destination.icon,
-                                        contentDescription = destination.title,
-                                        tint = if (isSelected) MutantPalette.PrimaryPurple else MutantPalette.TextSecondary
-                                    )
-                                }
-                            },
-                            label = {
-                                Text(
-                                    text = destination.title,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        fontSize = MutantTypeScale.label
-                                    )
-                                )
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MutantPalette.PrimaryPurple,
-                                selectedTextColor = MutantPalette.PrimaryPurple,
-                                unselectedIconColor = MutantPalette.TextSecondary,
-                                unselectedTextColor = MutantPalette.TextMetadata,
-                                indicatorColor = MutantPalette.PrimaryContainer
-                            ),
-                            modifier = Modifier.testTag(destination.testTag)
-                        )
-                    }
-                }
+                MutantNavigationBar(
+                    current = currentScreen,
+                    hasActiveSession = activeSession != null,
+                    onSelect = { currentScreen = it }
+                )
             }
         }
     ) { innerPadding ->
@@ -201,7 +161,8 @@ fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableShar
                 when (destination) {
                     NavDestination.HOME -> HomeScreen(
                         viewModel = viewModel,
-                        onNavigateToActiveWorkout = { currentScreen = NavDestination.WORKOUT }
+                        onNavigateToActiveWorkout = { currentScreen = NavDestination.WORKOUT },
+                        onNavigateToHistory = { currentScreen = NavDestination.HISTORY }
                     )
                     NavDestination.WORKOUT -> ActiveWorkoutScreen(
                         viewModel = viewModel,
@@ -243,14 +204,70 @@ fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableShar
 
     com.example.ui.designsystem.components.MutantLoadingOverlay(
         visible = isStartingWorkout,
-        message = "Iniciando sessão de treino...",
-        subMessage = "Configurando exercícios e séries...",
+        message = "Starting workout…",
+        subMessage = "Setting up exercises and sets",
         testTag = "starting_workout_overlay"
     )
 
     com.example.ui.designsystem.components.MutantLoadingOverlay(
         visible = isLoadingWorkout,
-        message = "Carregando treino para edição...",
+        message = "Opening workout…",
         testTag = "loading_workout_overlay"
     )
+
+    com.example.ui.designsystem.components.MutantToastHost(
+        state = toastState,
+        modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp)
+    )
+    }
+    }
+}
+
+@Composable
+private fun MutantNavigationBar(current: NavDestination, hasActiveSession: Boolean, onSelect: (NavDestination) -> Unit) {
+    Column(Modifier.fillMaxWidth().background(MutantPalette.Surface).testTag("mutant_bottom_bar")) {
+        HorizontalDivider(color = MutantPalette.SurfaceContainerHigh)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
+        ) {
+            NavDestination.entries.forEach { destination ->
+                val selected = current == destination
+                val tint = if (selected) MutantPalette.TextPrimary else MutantPalette.TextSecondary
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .height(60.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(destination) })
+                        .testTag(destination.testTag),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically)
+                ) {
+                    Box(
+                        Modifier
+                            .size(width = 60.dp, height = 30.dp)
+                            .background(if (selected) MutantPalette.PrimaryIndicator else androidx.compose.ui.graphics.Color.Transparent, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(if (selected) destination.selectedIcon else destination.icon, contentDescription = null,
+                            tint = tint, modifier = Modifier.size(22.dp))
+                        if (destination == NavDestination.WORKOUT && hasActiveSession) {
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(top = 3.dp, end = 14.dp)
+                                    .size(7.dp)
+                                    .background(MutantPalette.Primary, CircleShape)
+                                    .testTag("nav_active_session_dot")
+                            )
+                        }
+                    }
+                    Text(destination.title, style = MutantType.Chip.copy(fontSize = 11.5.sp), color = tint)
+                }
+            }
+        }
+    }
 }

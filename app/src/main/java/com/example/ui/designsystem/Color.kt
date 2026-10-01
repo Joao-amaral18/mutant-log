@@ -15,6 +15,13 @@ object MutantColors {
     // Brand purple is reserved for current, selected, and primary-action states.
     val Primary = Color(0xFFB388FF)
     val OnPrimary = Color(0xFF23003D)
+    // Translucent primary for selected chips, nav indicator and the target card.
+    val PrimarySelected = Color(0x24B388FF)
+    val PrimaryIndicator = Color(0x38B388FF)
+    val PrimaryTint = Color(0x14B388FF)
+    val PrimaryTintBorder = Color(0x59B388FF)
+    // Current row in the session exercise list.
+    val PrimaryRow = Color(0xFF21192F)
 
     val PrimaryContainer = Color(0xFF432267)
     val OnPrimaryContainer = Color(0xFFE9DDFF)
@@ -34,6 +41,13 @@ object MutantColors {
 
     val Outline = Color(0xFF49424F)
     val OutlineVariant = Color(0xFF302A36)
+    // Control borders sit between card borders and sheet lines.
+    val Line = Color(0xFF2A2337)
+    val Handle = Outline
+    val Scrim = Color(0xB8050408)
+    val Toast = TextPrimary
+    val OnToast = Background
+    val ToastAccent = PrimaryContainer
 
     val Success = Color(0xFF4ADE80)
     val SuccessContainer = Color(0xFF193B26)
@@ -44,6 +58,9 @@ object MutantColors {
     val Error = Color(0xFFFFB4AB)
     val OnError = Color(0xFF690005)
     val ErrorContainer = Color(0xFF491216)
+    // Swipe-to-remove backdrop.
+    val Destructive = Color(0xFF93000A)
+    val OnDestructive = Color(0xFFFFDAD6)
 
     // Aliases for MutantPalette compatibility across screens & components
     val AppBackground = Background

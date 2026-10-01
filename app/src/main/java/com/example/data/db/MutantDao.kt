@@ -13,6 +13,24 @@ data class ProgramExerciseDetail(
     val exercise: Exercise
 )
 
+/** Everything removed with a session exercise, kept so the removal can be undone. */
+data class RemovedSessionExercise(
+    val sessionId: Long,
+    val position: Int,
+    val previousExerciseIndex: Int,
+    val workoutExercise: WorkoutExercise,
+    val sets: List<WorkoutSet>,
+    val segments: List<SetSegment>
+)
+
+/** Per-day plan totals for the protocol list. */
+data class ProgramDaySummary(
+    val programDayId: Long,
+    val exerciseCount: Int,
+    val setCount: Int,
+    val restSeconds: Int
+)
+
 data class WorkoutExerciseDetail(
     @Embedded val workoutExercise: WorkoutExercise,
     @Relation(
@@ -122,6 +140,61 @@ interface MutantDao {
 
     @Query("UPDATE workout_sessions SET currentExerciseIndex = :index WHERE id = :id AND finishedAt IS NULL")
     suspend fun selectExercise(id: Long, index: Int)
+
+    @Query("SELECT * FROM workout_sets WHERE workoutExerciseId = :weId ORDER BY setNumber ASC")
+    suspend fun getSetsForWorkoutExerciseSync(weId: Long): List<WorkoutSet>
+    @Query("SELECT * FROM set_segments WHERE workoutSetId IN (:setIds) ORDER BY workoutSetId ASC, segmentIndex ASC")
+    suspend fun getSegmentsForSetsSync(setIds: List<Long>): List<SetSegment>
+    @Query("UPDATE workout_exercises SET orderIndex = :orderIndex WHERE id = :id")
+    suspend fun setWorkoutExerciseOrder(id: Long, orderIndex: Int)
+
+    /** Today-only addition: the program stays untouched. Inserted at [position] in the session order. */
+    @Transaction
+    suspend fun addExerciseToActiveSession(sessionId: Long, exerciseId: Long, position: Int): Long {
+        val session = checkNotNull(getSessionSync(sessionId)?.takeIf { it.finishedAt == null }) { "Session is no longer active" }
+        val current = getWorkoutDetailsSync(session.id).map { it.workoutExercise.id }
+        val at = position.coerceIn(0, current.size)
+        val id = insertWorkoutExercise(WorkoutExercise(workoutSessionId = session.id, exerciseId = exerciseId, orderIndex = at))
+        (current.take(at) + id + current.drop(at)).forEachIndexed { index, weId -> setWorkoutExerciseOrder(weId, index) }
+        // Keep the user on the exercise they were doing.
+        if (at <= session.currentExerciseIndex && current.isNotEmpty()) selectExercise(session.id, session.currentExerciseIndex + 1)
+        return id
+    }
+
+    /** Removes one exercise and its sets from the active session; the last exercise cannot be removed. */
+    @Transaction
+    suspend fun removeExerciseFromActiveSession(sessionId: Long, workoutExerciseId: Long): RemovedSessionExercise {
+        val session = checkNotNull(getSessionSync(sessionId)?.takeIf { it.finishedAt == null }) { "Session is no longer active" }
+        val current = getWorkoutDetailsSync(session.id).map { it.workoutExercise }
+        val position = current.indexOfFirst { it.id == workoutExerciseId }
+        check(position >= 0) { "Exercise is not in this session" }
+        check(current.size > 1) { "Keep at least one exercise" }
+        val sets = getSetsForWorkoutExerciseSync(workoutExerciseId)
+        val segments = if (sets.isEmpty()) emptyList() else getSegmentsForSetsSync(sets.map { it.id })
+        deleteWorkoutExercise(workoutExerciseId)
+        val remaining = current.filter { it.id != workoutExerciseId }
+        (remaining.map { it.id }).forEachIndexed { index, weId -> setWorkoutExerciseOrder(weId, index) }
+        val index = session.currentExerciseIndex
+        val nextIndex = when {
+            position < index -> index - 1
+            else -> index.coerceAtMost(remaining.lastIndex)
+        }
+        if (nextIndex != index) selectExercise(session.id, nextIndex)
+        return RemovedSessionExercise(session.id, position, index, current[position], sets, segments)
+    }
+
+    /** Puts a removed exercise back with its original ids, sets and segments. */
+    @Transaction
+    suspend fun restoreRemovedExercise(removed: RemovedSessionExercise) {
+        val session = checkNotNull(getSessionSync(removed.sessionId)?.takeIf { it.finishedAt == null }) { "Session is no longer active" }
+        val current = getWorkoutDetailsSync(session.id).map { it.workoutExercise.id }
+        insertWorkoutExercise(removed.workoutExercise)
+        removed.sets.forEach { insertWorkoutSet(it) }
+        removed.segments.forEach { insertSetSegment(it) }
+        val at = removed.position.coerceIn(0, current.size)
+        (current.take(at) + removed.workoutExercise.id + current.drop(at)).forEachIndexed { index, weId -> setWorkoutExerciseOrder(weId, index) }
+        selectExercise(session.id, removed.previousExerciseIndex.coerceIn(0, current.size))
+    }
     @Query("UPDATE workout_sessions SET restDeadline = :deadline, restRemainingSeconds = :remaining, restCompleted = :completed, restRecommended = :recommended WHERE id = :id AND finishedAt IS NULL")
     suspend fun setRestState(id: Long, deadline: Long?, remaining: Int, completed: Boolean, recommended: String)
     @Query("UPDATE workout_exercises SET nextSetWeightKg = :weight, nextSetReps = :reps WHERE id = :id AND workoutSessionId IN (SELECT id FROM workout_sessions WHERE finishedAt IS NULL)")
@@ -259,6 +332,13 @@ interface MutantDao {
     @Transaction
     @Query("SELECT * FROM program_exercises WHERE programDayId = :dayId ORDER BY orderIndex ASC")
     fun getProgramExercisesForDay(dayId: Long): Flow<List<ProgramExerciseDetail>>
+
+    @Query("""
+        SELECT programDayId, COUNT(*) AS exerciseCount, SUM(targetWorkSets) AS setCount,
+               SUM(targetWorkSets * restSeconds) AS restSeconds
+        FROM program_exercises GROUP BY programDayId
+    """)
+    fun observeProgramDaySummaries(): Flow<List<ProgramDaySummary>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProgramExercise(pe: ProgramExercise): Long
