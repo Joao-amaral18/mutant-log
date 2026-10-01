@@ -1,33 +1,32 @@
 package com.example.ui.components
 
-import com.example.ui.designsystem.MutantStrokeWidths
-
-import com.example.ui.designsystem.MutantSpacing
-
-import com.example.ui.designsystem.MutantShapeTokens
-
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.*
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.example.data.model.SetSegment
-import com.example.ui.theme.*
+import com.example.ui.designsystem.MutantColors
+import com.example.ui.designsystem.MutantType
+import com.example.ui.designsystem.components.*
+import java.math.BigDecimal
 
+private fun kg(value: Float) = BigDecimal(value.toString()).stripTrailingZeros().toPlainString()
+
+/** Mini-sets after the main set: drops in load, or short pauses at the same load. */
 @Composable
 fun IntensitySegmentDialog(
     initialWeight: Float,
@@ -36,186 +35,81 @@ fun IntensitySegmentDialog(
     onDismiss: () -> Unit,
     onSaveSegments: (List<SetSegment>) -> Unit
 ) {
-    val segments = remember {
-        mutableStateListOf(
-            SetSegment(
-                workoutSetId = 0,
-                segmentIndex = 1,
-                type = techniqueName.uppercase().replace(" ", "_"),
-                weightKg = if (techniqueName == "Drop set") (initialWeight * 0.75f) else initialWeight,
-                reps = (initialReps / 2).coerceAtLeast(4),
-                restSeconds = if (techniqueName == "Rest-pause") 20 else 5
+    val drop = techniqueName == "Drop set"
+    val type = if (drop) "DROP_SET" else "REST_PAUSE"
+    fun next(previousWeight: Float, previousReps: Int, index: Int) = SetSegment(
+        workoutSetId = 0, segmentIndex = index, type = type,
+        weightKg = if (drop) (previousWeight * 0.8f / 2.5f).toInt() * 2.5f else previousWeight,
+        reps = (previousReps / 2).coerceAtLeast(3),
+        restSeconds = if (drop) 5 else 20
+    )
+    val segments = remember { mutableStateListOf(next(initialWeight, initialReps, 1)) }
+
+    MutantBottomSheet(onDismiss = onDismiss, modifier = Modifier.testTag("intensity_segment_dialog")) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            MutantEyebrow("MAIN SET · ${kg(initialWeight)} KG × $initialReps", color = MutantColors.Primary)
+            Text(techniqueName, style = MutantType.SheetTitle, color = MutantColors.TextPrimary)
+            Text(
+                if (drop) "Strip the load and keep going without a break." else "Rack it for about 20 seconds, then squeeze out a few more reps.",
+                style = MutantType.BodySmall, color = MutantColors.TextSecondary, modifier = Modifier.offset(y = (-4).dp)
             )
-        )
-    }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
-                .clip(MutantShapeTokens.Panel)
-                .testTag("intensity_segment_dialog"),
-            color = MutantSurfaceCard,
-            border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantBorder)
-        ) {
-            Column(modifier = Modifier.padding(MutantSpacing.lgCompact)) {
+            segments.forEachIndexed { index, seg ->
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    Modifier
+                        .fillMaxWidth()
+                        .background(MutantColors.Background, RoundedCornerShape(16.dp))
+                        .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(16.dp))
+                        .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
+                        .testTag("segment_$index"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = "$techniqueName PROTOCOL",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MutantVolt
-                        )
-                    )
-                    Text(
-                        text = "Base: ${initialWeight}kg × $initialReps",
-                        style = MaterialTheme.typography.labelSmall.copy(color = MutantTextSecondary)
-                    )
-                }
-
-                Text(
-                    text = "Log segmented mini-sets executed without racking the barbell or during short pause intervals.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = MutantTextSecondary),
-                    modifier = Modifier.padding(top = MutantSpacing.xxs, bottom = MutantSpacing.sm)
-                )
-
-                // Segments list
-                Column(verticalArrangement = Arrangement.spacedBy(MutantSpacing.xs)) {
-                    segments.forEachIndexed { index, seg ->
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = MutantDarkNavy,
-                            shape = MutantShapeTokens.CompactControl,
-                            border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantBorder)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = MutantSpacing.compactMd, vertical = MutantSpacing.xs),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "Segment ${index + 1}",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = MutantVolt
-                                    )
-                                )
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(MutantSpacing.xs)
-                                ) {
-                                    // Weight
-                                    Text(
-                                        text = "${seg.weightKg} kg",
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = MutantTextPrimary
-                                        )
-                                    )
-                                    Text(
-                                        text = "×",
-                                        style = MaterialTheme.typography.bodySmall.copy(color = MutantTextMuted)
-                                    )
-                                    // Reps
-                                    Text(
-                                        text = "${seg.reps} reps",
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = MutantTextPrimary
-                                        )
-                                    )
-
-                                    if (techniqueName == "Rest-pause") {
-                                        Text(
-                                            text = "(${seg.restSeconds}s rest)",
-                                            style = MaterialTheme.typography.labelSmall.copy(color = MutantCyan)
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = { segments.removeAt(index) },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Remove segment",
-                                            tint = MutantRed,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(MutantSpacing.compactMd))
-
-                // Add segment button
-                OutlinedButton(
-                    onClick = {
-                        val last = segments.lastOrNull()
-                        val nextWeight = if (techniqueName == "Drop set")
-                            ((last?.weightKg ?: initialWeight) - 10f).coerceAtLeast(10f)
-                        else
-                            (last?.weightKg ?: initialWeight)
-                        val nextReps = ((last?.reps ?: 6) - 2).coerceAtLeast(3)
-                        segments.add(
-                            SetSegment(
-                                workoutSetId = 0,
-                                segmentIndex = segments.size + 1,
-                                type = techniqueName.uppercase().replace(" ", "_"),
-                                weightKg = nextWeight,
-                                reps = nextReps,
-                                restSeconds = if (techniqueName == "Rest-pause") 20 else 5
-                            )
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MutantShapeTokens.TinyControl,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MutantVolt),
-                    border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantVolt.copy(alpha = 0.5f))
-                ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(MutantSpacing.compact))
-                    Text("Add Next Mini-Segment")
-                }
-
-                Spacer(modifier = Modifier.height(MutantSpacing.md))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(MutantSpacing.xs)
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MutantTextSecondary),
-                        border = androidx.compose.foundation.BorderStroke(MutantStrokeWidths.Standard, MutantBorder)
-                    ) {
-                        Text("Cancel")
-                    }
-
-                    Button(
-                        onClick = { onSaveSegments(segments.toList()) },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MutantVolt,
-                            contentColor = MutantOnVolt
-                        )
-                    ) {
-                        Text("Attach", fontWeight = FontWeight.Bold)
+                    Text("${index + 1}", style = MutantType.MonoBody.copy(fontWeight = FontWeight.Bold), color = MutantColors.Primary,
+                        modifier = Modifier.width(18.dp))
+                    MiniStepper("${kg(seg.weightKg)} kg", Modifier.weight(1.2f),
+                        onMinus = { segments[index] = seg.copy(weightKg = (seg.weightKg - 2.5f).coerceAtLeast(0f)) },
+                        onPlus = { segments[index] = seg.copy(weightKg = seg.weightKg + 2.5f) })
+                    MiniStepper("${seg.reps} reps", Modifier.weight(1f),
+                        onMinus = { segments[index] = seg.copy(reps = (seg.reps - 1).coerceAtLeast(1)) },
+                        onPlus = { segments[index] = seg.copy(reps = seg.reps + 1) })
+                    IconButton(onClick = { segments.removeAt(index) }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Remove segment ${index + 1}", tint = MutantColors.TextMetadata,
+                            modifier = Modifier.size(18.dp))
                     }
                 }
             }
+            MutantButton(
+                "Add segment",
+                onClick = {
+                    val last = segments.lastOrNull()
+                    segments.add(next(last?.weightKg ?: initialWeight, last?.reps ?: initialReps, segments.size + 1))
+                },
+                style = MutantButtonStyle.Surface, icon = Icons.Rounded.Add, height = 48.dp, textStyle = MutantType.ButtonSmall,
+                modifier = Modifier.fillMaxWidth().testTag("add_segment")
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                MutantButton("Cancel", onClick = onDismiss, style = MutantButtonStyle.Outline, height = 54.dp,
+                    textStyle = MutantType.Button.copy(fontSize = 15.sp), modifier = Modifier.weight(1f))
+                MutantButton(
+                    "Save ${segments.size} segment${if (segments.size == 1) "" else "s"}",
+                    onClick = { onSaveSegments(segments.mapIndexed { i, s -> s.copy(segmentIndex = i + 1) }) },
+                    height = 54.dp, modifier = Modifier.weight(2f).testTag("save_segments")
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniStepper(value: String, modifier: Modifier, onMinus: () -> Unit, onPlus: () -> Unit) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onMinus, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Rounded.Remove, contentDescription = "Less", tint = MutantColors.TextSecondary, modifier = Modifier.size(18.dp))
+        }
+        Text(value, style = MutantType.MonoBody.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold), color = MutantColors.TextPrimary,
+            maxLines = 1, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        IconButton(onClick = onPlus, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Rounded.Add, contentDescription = "More", tint = MutantColors.TextSecondary, modifier = Modifier.size(18.dp))
         }
     }
 }

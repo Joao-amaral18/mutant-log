@@ -72,7 +72,7 @@ fun SettingsDataDialog(
                 MutantButton(
                     text = if (isExporting) "Building JSON…" else "Export & share",
                     onClick = {
-                        viewModel.shareExportFile(context) {
+                        viewModel.shareExportFile(context, onError = { toast.show(it) }) {
                             toast.show("JSON ready · opening share sheet")
                             onDismiss()
                         }

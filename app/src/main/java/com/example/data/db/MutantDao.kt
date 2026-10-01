@@ -195,8 +195,8 @@ interface MutantDao {
         (current.take(at) + removed.workoutExercise.id + current.drop(at)).forEachIndexed { index, weId -> setWorkoutExerciseOrder(weId, index) }
         selectExercise(session.id, removed.previousExerciseIndex.coerceIn(0, current.size))
     }
-    @Query("UPDATE workout_sessions SET restDeadline = :deadline, restRemainingSeconds = :remaining, restCompleted = :completed, restRecommended = :recommended WHERE id = :id AND finishedAt IS NULL")
-    suspend fun setRestState(id: Long, deadline: Long?, remaining: Int, completed: Boolean, recommended: String)
+    @Query("UPDATE workout_sessions SET restDeadline = :deadline, restRemainingSeconds = :remaining, restCompleted = :completed, restRecommended = :recommended, restTotalSeconds = :total WHERE id = :id AND finishedAt IS NULL")
+    suspend fun setRestState(id: Long, deadline: Long?, remaining: Int, completed: Boolean, recommended: String, total: Int)
     @Query("UPDATE workout_exercises SET nextSetWeightKg = :weight, nextSetReps = :reps WHERE id = :id AND workoutSessionId IN (SELECT id FROM workout_sessions WHERE finishedAt IS NULL)")
     suspend fun updateNextSet(id: Long, weight: Float, reps: Int)
     @Query("UPDATE workout_sessions SET restDeadline = NULL, restRemainingSeconds = 0, restCompleted = 1 WHERE id = :id AND finishedAt IS NULL AND restDeadline = :deadline AND restDeadline <= :now")
@@ -209,7 +209,13 @@ interface MutantDao {
         val running = session.restDeadline != null && remaining > 0
         val next = when (action) { "start" -> seconds.coerceAtLeast(0); "adjust" -> (remaining + seconds).coerceAtLeast(0); "skip", "complete" -> 0; else -> remaining }
         val run = when (action) { "start" -> true; "toggle" -> !running; else -> running }
-        setRestState(session.id, if (run && next > 0) now + next * 1000L else null, next, action == "complete", recommended ?: session.restRecommended)
+        val total = when (action) {
+            "start" -> next
+            "adjust" -> maxOf(session.restTotalSeconds, next)
+            "skip" -> 0
+            else -> session.restTotalSeconds
+        }
+        setRestState(session.id, if (run && next > 0) now + next * 1000L else null, next, action == "complete", recommended ?: session.restRecommended, total)
     }
 
     // --- REFERENCE DATA: Muscle Groups ---

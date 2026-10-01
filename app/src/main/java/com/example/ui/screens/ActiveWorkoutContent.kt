@@ -1,5 +1,11 @@
 package com.example.ui.screens
 
+import com.example.data.db.plannedSets
+import com.example.data.db.repMin
+import com.example.data.db.repMax
+import com.example.data.db.plannedRir
+import com.example.data.db.plannedRestSeconds
+import com.example.data.db.WorkoutExerciseDetail
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -64,13 +70,23 @@ fun platesPerSide(totalKg: Float): String {
 }
 
 /** Load and reps to aim for today, from the double-progression recommendation. */
-fun targetFor(progression: ProgressionRecommendation?, previous: List<WorkoutSet>, exercise: Exercise): Pair<Float, Int>? {
+fun targetFor(progression: ProgressionRecommendation?, previous: List<WorkoutSet>, detail: WorkoutExerciseDetail): Pair<Float, Int>? {
     if (progression == null || progression.status == ProgressionStatus.FIRST_TIME) return null
     val reps = when (progression.status) {
-        ProgressionStatus.INCREASE_LOAD -> exercise.defaultRepMin
-        else -> ((previous.minOfOrNull { it.reps } ?: exercise.defaultRepMin) + 1).coerceIn(exercise.defaultRepMin, exercise.defaultRepMax)
+        ProgressionStatus.INCREASE_LOAD -> detail.repMin
+        else -> ((previous.minOfOrNull { it.reps } ?: detail.repMin) + 1).coerceIn(detail.repMin, detail.repMax)
     }
     return progression.suggestedWeightKg to reps
+}
+
+/** Target for each planned set: +1 rep on each previous set until the top of the range, reset after a load increase. */
+fun perSetTargets(progression: ProgressionRecommendation?, previous: List<WorkoutSet>, detail: WorkoutExerciseDetail): List<Pair<Float, Int>> {
+    val target = targetFor(progression, previous, detail) ?: return emptyList()
+    return (0 until detail.plannedSets).map { index ->
+        val reps = if (progression?.status == ProgressionStatus.INCREASE_LOAD) detail.repMin
+        else ((previous.getOrNull(index)?.reps ?: (target.second - 1)) + 1).coerceIn(detail.repMin, detail.repMax)
+        target.first to reps
+    }
 }
 
 private fun techniqueBadge(technique: IntensityTechnique): String? = when (technique) {
@@ -120,11 +136,11 @@ fun ActiveWorkoutContent(
     val workSets = detail.sets.filter { it.setType == SetType.WORK }
     val warmups = detail.sets.filter { it.setType == SetType.WARMUP }
     val doneSets = state.exercises.sumOf { d -> d.sets.count { it.setType == SetType.WORK } }
-    val totalSets = state.exercises.sumOf { it.exercise.defaultWorkSets }.coerceAtLeast(1)
+    val totalSets = state.exercises.sumOf { it.plannedSets }.coerceAtLeast(1)
 
     var setupOpen by remember(detail.workoutExercise.id) { mutableStateOf(false) }
     var extraSet by remember(detail.workoutExercise.id) { mutableStateOf(false) }
-    val complete = workSets.size >= exercise.defaultWorkSets
+    val complete = workSets.size >= detail.plannedSets
     val showLogger = !complete || extraSet || setType == SetType.WARMUP
     // A logged extra set returns the exercise to its done state.
     LaunchedEffect(workSets.size) { extraSet = false }
@@ -190,7 +206,7 @@ fun ActiveWorkoutContent(
                             number = index + 1,
                             label = item.exercise.baseName.ifBlank { item.exercise.name },
                             current = index == state.currentExerciseIndex,
-                            finished = item.sets.count { it.setType == SetType.WORK } >= item.exercise.defaultWorkSets,
+                            finished = item.sets.count { it.setType == SetType.WORK } >= item.plannedSets,
                             enabled = enabled,
                             onClick = { onSelectExercise(index) },
                             modifier = Modifier.testTag("exercise_progress_$index")
@@ -215,14 +231,14 @@ fun ActiveWorkoutContent(
                     Text(exercise.baseName.ifBlank { exercise.name }, style = MutantType.DisplayMedium, color = MutantColors.TextPrimary,
                         modifier = Modifier.testTag("exercise_name"))
                     Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SpecChip("${exercise.defaultWorkSets} × ${exercise.defaultRepMin}–${exercise.defaultRepMax}")
-                        SpecChip("RIR ${exercise.defaultRir}")
-                        SpecChip(restLabel(exercise.defaultRestSeconds), withTimer = true)
+                        SpecChip("${detail.plannedSets} × ${detail.repMin}–${detail.repMax}")
+                        SpecChip("RIR ${detail.plannedRir}")
+                        SpecChip(restLabel(detail.plannedRestSeconds), withTimer = true)
                     }
                 }
             }
             item(key = "target") {
-                val target = targetFor(state.currentProgression, state.previousWorkSets, exercise)
+                val target = targetFor(state.currentProgression, state.previousWorkSets, detail)
                 Surface(
                     onClick = onTarget,
                     modifier = Modifier.fillMaxWidth().testTag("target_banner"),
@@ -262,7 +278,8 @@ fun ActiveWorkoutContent(
             item(key = "sets") {
                 SetTable(
                     warmups = warmups, workSets = workSets, previous = state.previousWorkSets,
-                    plannedSets = exercise.defaultWorkSets,
+                    plannedSets = detail.plannedSets,
+                    targets = perSetTargets(state.currentProgression, state.previousWorkSets, detail),
                     draftActive = showLogger && setType == SetType.WORK,
                     draftWeight = weightValue, draftReps = repsValue, draftRir = rir,
                     enabled = enabled, onDelete = onDeleteSet
@@ -271,7 +288,7 @@ fun ActiveWorkoutContent(
             if (showLogger) {
                 item(key = "logger") {
                     SetLogger(
-                        exercise = exercise, workSetCount = workSets.size,
+                        exercise = exercise, plannedSets = detail.plannedSets, workSetCount = workSets.size,
                         weightValue = weightValue, repsValue = repsValue, setType = setType, rir = rir,
                         technique = technique, segments = segments, enabled = enabled,
                         onWeightChange = onWeightChange, onRepsChange = onRepsChange,
@@ -417,6 +434,7 @@ private fun SetTable(
     workSets: List<WorkoutSet>,
     previous: List<WorkoutSet>,
     plannedSets: Int,
+    targets: List<Pair<Float, Int>>,
     draftActive: Boolean,
     draftWeight: String,
     draftReps: String,
@@ -459,7 +477,11 @@ private fun SetTable(
                 )
                 else -> SetLine(
                     label = "${index + 1}", labelColor = MutantColors.TextMetadata, labelBackground = MutantColors.SurfaceContainerHigh,
-                    previous = prev, kg = "—", reps = "—", rir = "—",
+                    previous = prev,
+                    // Upcoming sets show their target, dimmed, so the plan is readable at a glance.
+                    kg = targets.getOrNull(index)?.let { loadLabel(it.first) } ?: "—",
+                    reps = targets.getOrNull(index)?.second?.toString() ?: "—",
+                    rir = "—",
                     textColor = MutantColors.TextMetadata, background = Color.Transparent,
                     badge = null, onDelete = null, tag = "set_row_pending_$index"
                 )
@@ -470,10 +492,12 @@ private fun SetTable(
 
 @Composable
 private fun SetGridRow(modifier: Modifier = Modifier, cell: @Composable (Int) -> Unit) {
+    // Fixed columns grow with the system font size so large text never clips.
+    val scale = androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceIn(1f, 1.5f)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         SetColumns.forEachIndexed { col, width ->
             Box(
-                if (width == 0.dp) Modifier.weight(1f) else Modifier.width(width),
+                if (width == 0.dp) Modifier.weight(1f) else Modifier.width(width * scale),
                 contentAlignment = if (col in 2..4) Alignment.CenterEnd else Alignment.CenterStart
             ) { cell(col) }
         }
@@ -524,6 +548,7 @@ private fun SetLine(
 @Composable
 private fun SetLogger(
     exercise: Exercise,
+    plannedSets: Int,
     workSetCount: Int,
     weightValue: String,
     repsValue: String,
@@ -615,7 +640,7 @@ private fun SetLogger(
             )
         }
         MutantButton(
-            if (warmup) "Log warm-up" else "Log set ${workSetCount + 1}/${exercise.defaultWorkSets}",
+            if (warmup) "Log warm-up" else "Log set ${workSetCount + 1}/$plannedSets",
             onClick = onLogSet, enabled = enabled && valid, icon = Icons.Rounded.Check,
             modifier = Modifier.fillMaxWidth().testTag("log_set_button")
         )

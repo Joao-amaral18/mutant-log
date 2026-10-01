@@ -56,14 +56,9 @@ fun MutantCard(
         modifier = cardModifier,
         shape = MutantShapeTokens.Card,
         color = containerColor,
-        border = border, // border is optional and omitted by default to respect tonal hierarchy
-        tonalElevation = when (variant) {
-            MutantCardVariant.SURFACE -> 0.dp
-            MutantCardVariant.CONTAINER_LOW -> 1.dp
-            MutantCardVariant.CONTAINER -> 2.dp
-            MutantCardVariant.CONTAINER_HIGH -> 4.dp
-            MutantCardVariant.CONTAINER_HIGHEST -> 6.dp
-        }
+        // Redesign cards: flat surface with a hairline outline; no tonal tint.
+        border = border ?: BorderStroke(1.dp, MutantColors.OutlineVariant),
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier

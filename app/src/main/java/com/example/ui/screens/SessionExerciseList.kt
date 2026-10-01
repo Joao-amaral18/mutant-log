@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.data.db.plannedSets
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -66,7 +67,7 @@ fun SessionExerciseList(
 ) {
     val session = state.session ?: return
     val doneSets = state.exercises.sumOf { d -> d.sets.count { it.setType == SetType.WORK } }
-    val totalSets = state.exercises.sumOf { it.exercise.defaultWorkSets }
+    val totalSets = state.exercises.sumOf { it.plannedSets }
     var revealedId by remember { mutableStateOf<Long?>(null) }
 
     Scaffold(
@@ -218,7 +219,7 @@ private fun SessionExerciseRow(
 ) {
     val exercise = detail.exercise
     val done = detail.sets.count { it.setType == SetType.WORK }
-    val planned = exercise.defaultWorkSets.coerceAtLeast(1)
+    val planned = detail.plannedSets
     val finished = done >= planned
     val started = done > 0
     val (status, statusColor) = when {

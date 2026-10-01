@@ -124,8 +124,9 @@ fun CardioScreen(
                 MutantButton(
                     "Save cardio",
                     onClick = {
-                        viewModel.logCardio(machine, minutes, level, heartRate, rpe)
-                        toast.show("${machineFor(machine).label} · $minutes min saved")
+                        val label = "${machineFor(machine).label} · $minutes min saved"
+                        viewModel.logCardio(machine, minutes, level, heartRate, rpe,
+                            onSaved = { toast.show(label) }, onError = { toast.show(it) })
                     },
                     height = 56.dp,
                     modifier = Modifier.fillMaxWidth().testTag("save_cardio_button")

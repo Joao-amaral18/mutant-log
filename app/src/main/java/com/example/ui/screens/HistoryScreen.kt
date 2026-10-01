@@ -159,9 +159,10 @@ internal fun HistoryContent(
 
 @Composable
 internal fun HistoryHeader(title: String, onBack: () -> Unit, action: (@Composable () -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth().padding(end = MutantSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = MutantSpacing.xs, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MutantColors.TextSecondary) }
+        Text(title, style = MutantType.Title, color = MutantColors.TextPrimary, maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         action?.invoke()
     }
 }

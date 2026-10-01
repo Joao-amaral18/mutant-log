@@ -23,27 +23,18 @@ import com.example.data.repository.ReadinessInput
 import com.example.ui.designsystem.MutantColors
 import com.example.ui.designsystem.MutantType
 import com.example.ui.designsystem.components.*
-import kotlin.math.roundToInt
-
-private val JointLevels = listOf("None", "Mild", "Moderate", "Severe")
+import com.example.data.model.JointDiscomfortLevels
+import com.example.data.model.ReadinessBand
+import com.example.data.model.readinessBand
 
 internal data class ReadinessVerdict(val label: String, val color: Color, val icon: ImageVector, val message: String)
 
-/** 0–100. Sleep, energy and focus carry 60%; soreness and joint pain 20% each. */
-internal fun readinessScore(input: ReadinessInput): Int {
-    val joint = JointLevels.indexOfFirst { it.equals(input.jointDiscomfort, ignoreCase = true) }.coerceAtLeast(0)
-    val drive = (input.sleep + input.energy + input.motivation - 3) / 12f
-    val soreness = (5 - input.soreness) / 4f
-    val joints = (3 - joint) / 3f
-    return ((drive * 0.6f + soreness * 0.2f + joints * 0.2f) * 100).roundToInt().coerceIn(0, 100)
-}
-
-internal fun readinessVerdict(score: Int): ReadinessVerdict = when {
-    score >= 70 -> ReadinessVerdict("Ready", MutantColors.Success, Icons.Rounded.Bolt,
+internal fun readinessVerdict(score: Int): ReadinessVerdict = when (readinessBand(score)) {
+    ReadinessBand.READY -> ReadinessVerdict("Ready", MutantColors.Success, Icons.Rounded.Bolt,
         "Green light. Go for today’s targets.")
-    score >= 45 -> ReadinessVerdict("Moderate", MutantColors.Warning, Icons.Rounded.Warning,
+    ReadinessBand.MODERATE -> ReadinessVerdict("Moderate", MutantColors.Warning, Icons.Rounded.Warning,
         "Partly recovered. Hold loads and stay at the top of the RIR range.")
-    else -> ReadinessVerdict("High fatigue", MutantColors.Error, Icons.Rounded.Error,
+    ReadinessBand.HIGH_FATIGUE -> ReadinessVerdict("High fatigue", MutantColors.Error, Icons.Rounded.Error,
         "Fatigue is stacking up. Drop one set per exercise, or take a rest day.")
 }
 
@@ -55,7 +46,7 @@ fun ReadinessDialog(
     onConfirm: (ReadinessInput) -> Unit
 ) {
     var input by remember { mutableStateOf(initialInput) }
-    val score = readinessScore(input)
+    val score = input.score
     val verdict = readinessVerdict(score)
 
     MutantBottomSheet(onDismiss = onDismiss, modifier = Modifier.testTag("readiness_dialog")) {
@@ -82,7 +73,7 @@ fun ReadinessDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Joint pain", style = MutantType.RowTitle.copy(fontSize = 14.sp), color = MutantColors.TextPrimary)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    JointLevels.forEach { level ->
+                    JointDiscomfortLevels.forEach { level ->
                         MutantChoiceChip(
                             label = level,
                             selected = input.jointDiscomfort.equals(level, ignoreCase = true),
