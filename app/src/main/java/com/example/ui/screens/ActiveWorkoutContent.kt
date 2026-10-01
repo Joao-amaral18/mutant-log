@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.rounded.Check
@@ -109,6 +110,7 @@ fun ActiveWorkoutContent(
     onLogSet: () -> Unit,
     modifier: Modifier = Modifier,
     onDeleteSet: (Long) -> Unit = {},
+    onOpenList: () -> Unit = {},
     setupEditor: @Composable () -> Unit = {},
     restTimer: @Composable () -> Unit = {}
 ) {
@@ -160,7 +162,27 @@ fun ActiveWorkoutContent(
                 }
                 ProgressTrack(doneSets / totalSets.toFloat(), Modifier.padding(start = 20.dp, end = 20.dp, top = 10.dp))
                 Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
+                    Modifier.fillMaxWidth().padding(start = 20.dp, top = 12.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        onClick = onOpenList,
+                        modifier = Modifier.height(36.dp).testTag("view_all_exercises"),
+                        shape = RoundedCornerShape(18.dp),
+                        color = MutantColors.SurfaceContainerHigh,
+                        border = BorderStroke(1.dp, MutantColors.Outline)
+                    ) {
+                        Row(Modifier.padding(start = 10.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.AutoMirrored.Outlined.ViewList, contentDescription = null, tint = MutantColors.Primary,
+                                modifier = Modifier.size(18.dp))
+                            Text("View all", style = MutantType.Chip, color = MutantColors.TextPrimary, maxLines = 1)
+                        }
+                    }
+                    Box(Modifier.width(1.dp).height(20.dp).background(MutantColors.Line))
+                Row(
+                    Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(end = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     state.exercises.forEachIndexed { index, item ->
@@ -174,6 +196,7 @@ fun ActiveWorkoutContent(
                             modifier = Modifier.testTag("exercise_progress_$index")
                         )
                     }
+                }
                 }
             }
         },
@@ -294,7 +317,7 @@ private fun ExercisePill(number: Int, label: String, current: Boolean, finished:
         onClick = onClick, enabled = enabled,
         modifier = modifier.height(36.dp),
         shape = RoundedCornerShape(18.dp),
-        color = if (current) MutantColors.PrimarySelected else MutantColors.Surface,
+        color = if (current) MutantColors.PrimarySelected else MutantColors.SurfaceContainer,
         border = BorderStroke(1.dp, if (current) MutantColors.Primary else MutantColors.OutlineVariant)
     ) {
         Row(Modifier.padding(start = 8.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically,
@@ -348,7 +371,7 @@ private fun SetupCard(
     Column(
         Modifier
             .fillMaxWidth()
-            .background(MutantColors.Surface, RoundedCornerShape(18.dp))
+            .background(MutantColors.SurfaceContainer, RoundedCornerShape(18.dp))
             .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(18.dp))
     ) {
         Surface(onClick = onToggle, color = Color.Transparent, shape = RoundedCornerShape(18.dp),
@@ -525,7 +548,7 @@ private fun SetLogger(
     Column(
         Modifier
             .fillMaxWidth()
-            .background(MutantColors.Surface, RoundedCornerShape(22.dp))
+            .background(MutantColors.SurfaceContainer, RoundedCornerShape(22.dp))
             .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(22.dp))
             .padding(14.dp)
             .testTag("set_logger_card"),

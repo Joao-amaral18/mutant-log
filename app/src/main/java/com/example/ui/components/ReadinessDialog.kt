@@ -67,7 +67,7 @@ fun ReadinessDialog(
                         color = MutantColors.TextSecondary,
                         style = MutantType.Eyebrow.copy(fontSize = 10.5.sp, letterSpacing = 0.1.em)
                     )
-                    Text("How are you feeling?", style = MutantType.SheetTitle.copy(fontSize = 30.sp), color = MutantColors.TextPrimary)
+                    Text("How are you feeling?", style = MutantType.SheetTitle.copy(fontSize = 26.sp, lineHeight = 27.sp), color = MutantColors.TextPrimary)
                 }
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("$score", style = MutantType.MonoValue.copy(fontSize = 28.sp, lineHeight = 30.sp), color = verdict.color,

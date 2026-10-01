@@ -60,7 +60,7 @@ fun SettingsDataDialog(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .background(MutantColors.Surface, RoundedCornerShape(10.dp))
+                        .background(MutantColors.SurfaceContainer, RoundedCornerShape(10.dp))
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)

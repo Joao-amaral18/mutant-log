@@ -62,7 +62,7 @@ fun NoActiveWorkoutContent(
             Row(
                 Modifier
                     .height(30.dp)
-                    .background(MutantColors.Surface, RoundedCornerShape(15.dp))
+                    .background(MutantColors.SurfaceContainer, RoundedCornerShape(15.dp))
                     .border(1.dp, MutantColors.Line, RoundedCornerShape(15.dp))
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -135,7 +135,7 @@ fun NoActiveWorkoutContent(
         Surface(
             onClick = onNavigateToHistory,
             shape = RoundedCornerShape(18.dp),
-            color = MutantColors.Surface,
+            color = MutantColors.SurfaceContainer,
             border = BorderStroke(1.dp, MutantColors.OutlineVariant),
             modifier = Modifier.fillMaxWidth().testTag("last_logged_workout_card")
         ) {

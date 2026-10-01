@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.designsystem.MutantColors
 import com.example.ui.designsystem.MutantMotion
+import com.example.ui.designsystem.MutantShapeTokens
 import com.example.ui.designsystem.MutantType
 
 /** Mono uppercase label used above values and sections. */
@@ -55,7 +56,7 @@ fun MutantEyebrow(
 
 enum class MutantButtonStyle { Primary, Outline, Surface, Danger, Quiet }
 
-/** One button shape for every call to action: 18dp corners, sentence-case Archivo. */
+/** One button shape for every call to action: 14dp corners, sentence-case Inter. */
 @Composable
 fun MutantButton(
     text: String,
@@ -66,7 +67,7 @@ fun MutantButton(
     trailingIcon: ImageVector? = null,
     enabled: Boolean = true,
     loading: Boolean = false,
-    height: Dp = 58.dp,
+    height: Dp = 56.dp,
     textStyle: TextStyle = if (style == MutantButtonStyle.Primary || style == MutantButtonStyle.Danger) MutantType.Button
         else MutantType.Button.copy(fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
 ) {
@@ -77,14 +78,14 @@ fun MutantButton(
         MutantButtonStyle.Primary -> Triple(MutantColors.Primary, MutantColors.OnPrimary, null)
         MutantButtonStyle.Danger -> Triple(MutantColors.Error, MutantColors.OnError, null)
         MutantButtonStyle.Outline -> Triple(Color.Transparent, MutantColors.TextPrimary, BorderStroke(1.dp, MutantColors.Outline))
-        MutantButtonStyle.Surface -> Triple(MutantColors.Surface, MutantColors.TextPrimary, BorderStroke(1.dp, MutantColors.Line))
+        MutantButtonStyle.Surface -> Triple(MutantColors.SurfaceContainer, MutantColors.TextPrimary, BorderStroke(1.dp, MutantColors.Line))
         MutantButtonStyle.Quiet -> Triple(Color.Transparent, MutantColors.TextSecondary, null)
     }
     Button(
         onClick = onClick,
         enabled = enabled && !loading,
         interactionSource = interaction,
-        shape = RoundedCornerShape(if (height < 48.dp) height / 2 else 18.dp),
+        shape = if (height < 48.dp) RoundedCornerShape(height / 2) else MutantShapeTokens.Button,
         border = border,
         contentPadding = PaddingValues(horizontal = 16.dp),
         colors = ButtonDefaults.buttonColors(
@@ -253,7 +254,7 @@ fun MutantBottomSheet(
         onDismissRequest = { if (canDismiss) onDismiss() },
         sheetState = state,
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-        containerColor = MutantColors.Surface,
+        containerColor = MutantColors.SurfaceContainer,
         contentColor = MutantColors.TextPrimary,
         scrimColor = MutantColors.Scrim,
         dragHandle = {
@@ -279,11 +280,29 @@ fun MutantBottomSheet(
 class MutantToastState {
     var message by mutableStateOf<String?>(null)
         private set
+    var actionLabel by mutableStateOf<String?>(null)
+        private set
+    private var action: (() -> Unit)? = null
     private var serial by mutableIntStateOf(0)
 
-    fun show(text: String) {
+    /** With an action (e.g. Undo) the toast stays a little longer. */
+    fun show(text: String, actionLabel: String? = null, onAction: (() -> Unit)? = null) {
         message = text
+        this.actionLabel = actionLabel?.takeIf { onAction != null }
+        action = onAction
         serial++
+    }
+
+    fun performAction() {
+        val run = action
+        dismiss()
+        run?.invoke()
+    }
+
+    fun dismiss() {
+        message = null
+        actionLabel = null
+        action = null
     }
 
     @Composable
@@ -291,8 +310,8 @@ class MutantToastState {
         val current = serial
         LaunchedEffect(current) {
             if (message != null) {
-                kotlinx.coroutines.delay(2400)
-                if (serial == current) message = null
+                kotlinx.coroutines.delay(if (actionLabel != null) 4500 else 2400)
+                if (serial == current) dismiss()
             }
         }
     }
@@ -326,7 +345,16 @@ fun MutantToastHost(state: MutantToastState, modifier: Modifier = Modifier) {
                 Icons.Rounded.CheckCircle, contentDescription = null,
                 tint = MutantColors.ToastAccent, modifier = Modifier.size(20.dp)
             )
-            Text(last, style = MutantType.BodySmall.copy(fontWeight = FontWeight.SemiBold), color = MutantColors.OnToast)
+            Text(last, style = MutantType.BodySmall.copy(fontWeight = FontWeight.SemiBold), color = MutantColors.OnToast,
+                modifier = Modifier.weight(1f))
+            state.actionLabel?.let { label ->
+                TextButton(
+                    onClick = state::performAction,
+                    modifier = Modifier.height(32.dp).testTag("mutant_toast_action"),
+                    contentPadding = PaddingValues(horizontal = 10.dp),
+                    colors = ButtonDefaults.textButtonColors(contentColor = MutantColors.ToastAccent)
+                ) { Text(label, style = MutantType.ButtonSmall.copy(fontWeight = FontWeight.ExtraBold)) }
+            }
         }
     }
 }

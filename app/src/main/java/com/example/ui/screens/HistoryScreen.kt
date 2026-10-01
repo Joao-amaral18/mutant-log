@@ -230,7 +230,7 @@ internal fun HistorySegments(labels: List<String>, selected: Int, onSelect: (Int
     Row(
         Modifier
             .fillMaxWidth()
-            .background(MutantColors.Surface, RoundedCornerShape(14.dp))
+            .background(MutantColors.SurfaceContainer, RoundedCornerShape(14.dp))
             .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(14.dp))
             .padding(4.dp)
     ) {
@@ -254,7 +254,7 @@ internal fun HistorySessionCard(workout: HistoryWorkout, onOpen: () -> Unit) {
     Surface(
         onClick = onOpen,
         shape = RoundedCornerShape(18.dp),
-        color = MutantColors.Surface,
+        color = MutantColors.SurfaceContainer,
         border = BorderStroke(1.dp, MutantColors.OutlineVariant),
         modifier = Modifier.fillMaxWidth().testTag("history_session_${workout.session.id}")
     ) {
@@ -290,7 +290,7 @@ internal fun HistorySearch(value: String, onChange: (String) -> Unit, label: Str
         Modifier
             .fillMaxWidth()
             .height(46.dp)
-            .background(MutantColors.Surface, RoundedCornerShape(14.dp))
+            .background(MutantColors.SurfaceContainer, RoundedCornerShape(14.dp))
             .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(14.dp))
             .padding(start = 14.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,

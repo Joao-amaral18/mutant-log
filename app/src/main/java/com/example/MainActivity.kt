@@ -225,7 +225,7 @@ fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableShar
 
 @Composable
 private fun MutantNavigationBar(current: NavDestination, hasActiveSession: Boolean, onSelect: (NavDestination) -> Unit) {
-    Column(Modifier.fillMaxWidth().background(MutantPalette.SurfaceContainerLow).testTag("mutant_bottom_bar")) {
+    Column(Modifier.fillMaxWidth().background(MutantPalette.Surface).testTag("mutant_bottom_bar")) {
         HorizontalDivider(color = MutantPalette.SurfaceContainerHigh)
         Row(
             Modifier

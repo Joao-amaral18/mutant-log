@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -20,7 +21,7 @@ import com.example.ui.viewmodel.MutantViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private enum class SessionSheet { FINISH, DISCARD, PROGRESSION, READINESS }
+private enum class SessionSheet { FINISH, DISCARD, PROGRESSION, READINESS, ADD_EXERCISE, REMOVE_EXERCISE }
 
 @Composable
 fun ActiveWorkoutScreen(
@@ -42,6 +43,8 @@ fun ActiveWorkoutScreen(
     val toast = LocalMutantToast.current
 
     var sheet by remember(state.session?.id) { mutableStateOf<SessionSheet?>(null) }
+    var listOpen by remember(state.session?.id) { mutableStateOf(false) }
+    var removeTarget by remember(state.session?.id) { mutableStateOf<com.example.data.db.WorkoutExerciseDetail?>(null) }
     var discardFromFinish by remember(state.session?.id) { mutableStateOf(false) }
     var showFreeSessionDialog by remember { mutableStateOf(false) }
     val session = state.session
@@ -233,6 +236,85 @@ fun ActiveWorkoutScreen(
         viewModel.updateExerciseDetails(workoutExercise.id, execution, target, seatPos, handlePos, workoutExercise.notes)
     }
 
+    val restTimer: @Composable () -> Unit = {
+            RestTimerBar(
+                remainingSeconds = state.restTimerRemainingSeconds,
+                isRunning = state.isRestTimerRunning,
+                isComplete = state.restTimerCompleted,
+                plannedSeconds = exercise.defaultRestSeconds,
+                executionQuality = workoutExercise.executionQuality,
+                targetMuscleQuality = workoutExercise.targetMuscleQuality,
+                onExecutionQuality = { saveQuality(it, workoutExercise.targetMuscleQuality) },
+                onTargetMuscleQuality = { saveQuality(workoutExercise.executionQuality, it) },
+                onAdjustTime = viewModel::adjustRestTimer,
+                onTogglePlayPause = viewModel::toggleRestTimer,
+                onSkip = viewModel::skipRestTimer
+            )
+        }
+
+    val removeExercise: (com.example.data.db.WorkoutExerciseDetail) -> Unit = remove@{ detail ->
+        if (state.exercises.size <= 1) {
+            toast.show("Keep at least one exercise")
+            return@remove
+        }
+        if (detail.sets.isNotEmpty()) {
+            removeTarget = detail
+            sheet = SessionSheet.REMOVE_EXERCISE
+        } else {
+            val name = detail.exercise.baseName.ifBlank { detail.exercise.name }
+            viewModel.removeExerciseFromSession(detail.workoutExercise.id,
+                onRemoved = { toast.show("$name removed", "Undo", viewModel::undoRemoveExercise) },
+                onError = { toast.show(it) })
+        }
+    }
+
+    if (sheet == SessionSheet.ADD_EXERCISE) {
+        AddSessionExerciseSheet(
+            library = allExercises,
+            sessionExerciseIds = state.exercises.map { it.exercise.id }.toSet(),
+            currentLabel = exercise.baseName.ifBlank { exercise.name },
+            onAdd = { picked, afterCurrent ->
+                sheet = null
+                viewModel.addExerciseToSession(picked.id, afterCurrent) {
+                    toast.show("${picked.baseName.ifBlank { picked.name }} added")
+                }
+            },
+            onDismiss = { sheet = null }
+        )
+    }
+
+    val pendingRemoval = removeTarget
+    if (sheet == SessionSheet.REMOVE_EXERCISE && pendingRemoval != null) {
+        val name = pendingRemoval.exercise.baseName.ifBlank { pendingRemoval.exercise.name }
+        RemoveSessionExerciseSheet(
+            name = name,
+            loggedSets = pendingRemoval.sets.size,
+            onKeep = { sheet = null; removeTarget = null },
+            onRemove = {
+                sheet = null
+                removeTarget = null
+                viewModel.removeExerciseFromSession(pendingRemoval.workoutExercise.id,
+                    onRemoved = { toast.show("$name removed", "Undo", viewModel::undoRemoveExercise) },
+                    onError = { toast.show(it) })
+            }
+        )
+    }
+
+    BackHandler(enabled = listOpen) { listOpen = false }
+    if (listOpen) {
+        SessionExerciseList(
+            state = state,
+            enabled = !isDiscarding && !isFinishing,
+            onBack = { listOpen = false },
+            onPick = { index -> listOpen = false; viewModel.setCurrentExerciseIndex(index) },
+            onRemove = removeExercise,
+            onAdd = { sheet = SessionSheet.ADD_EXERCISE },
+            modifier = modifier,
+            restTimer = restTimer
+        )
+        return
+    }
+
     ActiveWorkoutContent(
         state = state,
         weightValue = weightInput,
@@ -260,6 +342,7 @@ fun ActiveWorkoutScreen(
         },
         onEditSegments = { showIntensityDialog = true },
         onDeleteSet = viewModel::deleteSet,
+        onOpenList = { listOpen = true },
         onLogSet = {
             val weight = weightInput.toFloatOrNull()
             val reps = repsInput.toIntOrNull()
@@ -316,20 +399,6 @@ fun ActiveWorkoutScreen(
                 }
             }
         },
-        restTimer = {
-            RestTimerBar(
-                remainingSeconds = state.restTimerRemainingSeconds,
-                isRunning = state.isRestTimerRunning,
-                isComplete = state.restTimerCompleted,
-                plannedSeconds = exercise.defaultRestSeconds,
-                executionQuality = workoutExercise.executionQuality,
-                targetMuscleQuality = workoutExercise.targetMuscleQuality,
-                onExecutionQuality = { saveQuality(it, workoutExercise.targetMuscleQuality) },
-                onTargetMuscleQuality = { saveQuality(workoutExercise.executionQuality, it) },
-                onAdjustTime = viewModel::adjustRestTimer,
-                onTogglePlayPause = viewModel::toggleRestTimer,
-                onSkip = viewModel::skipRestTimer
-            )
-        }
+        restTimer = restTimer
     )
 }

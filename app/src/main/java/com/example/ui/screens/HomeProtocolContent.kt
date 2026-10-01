@@ -123,7 +123,7 @@ fun NextWorkoutCard(
     Surface(
         modifier = modifier.fillMaxWidth().testTag("daily_status_card"),
         shape = RoundedCornerShape(26.dp),
-        color = MutantColors.Surface,
+        color = MutantColors.SurfaceContainer,
         border = BorderStroke(1.dp, MutantColors.OutlineVariant)
     ) {
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -254,7 +254,7 @@ fun WeekDayItem(
             .fillMaxWidth()
             .heightIn(min = 64.dp)
             .then(
-                if (next) Modifier.background(MutantColors.Surface, RoundedCornerShape(18.dp))
+                if (next) Modifier.background(MutantColors.SurfaceContainer, RoundedCornerShape(18.dp))
                     .border(1.dp, MutantColors.Outline, RoundedCornerShape(18.dp)) else Modifier
             )
             .padding(start = 12.dp, end = 4.dp)
@@ -299,7 +299,7 @@ fun EmptyProgramCard(
     Surface(
         modifier = modifier.fillMaxWidth().testTag("empty_program_card"),
         shape = RoundedCornerShape(26.dp),
-        color = MutantColors.Surface,
+        color = MutantColors.SurfaceContainer,
         border = BorderStroke(1.dp, MutantColors.OutlineVariant)
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {

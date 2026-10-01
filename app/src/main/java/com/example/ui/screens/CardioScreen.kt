@@ -150,7 +150,7 @@ fun CardioScreen(
 private fun CardioField(label: String, value: Int, onMinus: () -> Unit, onPlus: () -> Unit, tag: String, modifier: Modifier) {
     Column(
         modifier
-            .background(MutantColors.Surface, RoundedCornerShape(16.dp))
+            .background(MutantColors.SurfaceContainer, RoundedCornerShape(16.dp))
             .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(16.dp))
             .padding(start = 8.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -178,7 +178,7 @@ private fun CardioLogRow(session: CardioSession, whenLabel: String) {
     val machine = machineFor(session.machine)
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MutantColors.Surface,
+        color = MutantColors.SurfaceContainer,
         border = BorderStroke(1.dp, MutantColors.OutlineVariant),
         modifier = Modifier.fillMaxWidth().testTag("cardio_log_${session.id}")
     ) {

@@ -496,6 +496,42 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // --- TODAY-ONLY SESSION EDITS (the program is untouched) ---
+    private var lastRemovedExercise: com.example.data.db.RemovedSessionExercise? = null
+
+    fun addExerciseToSession(exerciseId: Long, afterCurrent: Boolean, onAdded: () -> Unit = {}) {
+        val state = _activeWorkoutUiState.value
+        val session = state.session ?: return
+        val position = if (afterCurrent) state.currentExerciseIndex + 1 else state.exercises.size
+        launchWorkoutMutation {
+            repository.addExerciseToSession(session.id, exerciseId, position)
+            onAdded()
+        }
+    }
+
+    /** [onRemoved] runs on success; an Undo can then call [undoRemoveExercise]. */
+    fun removeExerciseFromSession(workoutExerciseId: Long, onRemoved: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        val session = _activeWorkoutUiState.value.session ?: return
+        launchWorkoutMutation {
+            try {
+                lastRemovedExercise = repository.removeExerciseFromSession(session.id, workoutExerciseId)
+                onRemoved()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onError(e.message ?: "Could not remove the exercise.")
+            }
+        }
+    }
+
+    fun undoRemoveExercise() {
+        val removed = lastRemovedExercise ?: return
+        lastRemovedExercise = null
+        launchWorkoutMutation {
+            if (_activeWorkoutUiState.value.session?.id == removed.sessionId) repository.restoreSessionExercise(removed)
+        }
+    }
+
     fun deleteSet(setId: Long) {
         launchWorkoutMutation {
             repository.deleteSet(setId)

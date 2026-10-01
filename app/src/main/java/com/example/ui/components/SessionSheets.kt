@@ -45,7 +45,7 @@ fun FinishSessionSheet(
 
     MutantBottomSheet(onDismiss = onDismiss, dismissible = !isFinishing, modifier = Modifier.testTag("finish_sheet")) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Finish $title", style = MutantType.SheetTitle.copy(fontSize = 30.sp), color = MutantColors.TextPrimary)
+            Text("Finish $title", style = MutantType.SheetTitle.copy(fontSize = 26.sp, lineHeight = 27.sp), color = MutantColors.TextPrimary)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MutantStatWell("TIME", "$elapsedMinutes min", Modifier.weight(1f))
                 MutantStatWell("SETS", "$doneSets/$totalSets", Modifier.weight(1f))

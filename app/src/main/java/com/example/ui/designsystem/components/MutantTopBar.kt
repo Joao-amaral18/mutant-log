@@ -41,7 +41,7 @@ fun MutantTopBar(
             onClick = onGymClick,
             modifier = Modifier.height(40.dp).widthIn(max = 180.dp).testTag("gym_selector_chip"),
             shape = RoundedCornerShape(20.dp),
-            color = MutantColors.Surface,
+            color = MutantColors.SurfaceContainer,
             border = BorderStroke(1.dp, MutantColors.Line)
         ) {
             Row(
@@ -57,7 +57,7 @@ fun MutantTopBar(
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold), color = MutantColors.Primary)
                 }
                 Text(
-                    gymName ?: "Pick gym", style = MutantType.ButtonSmall, color = MutantColors.TextPrimary,
+                    gymName ?: "Pick gym", style = MutantType.Chip, color = MutantColors.TextPrimary,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false)
                 )
                 Icon(Icons.Rounded.ExpandMore, contentDescription = "Change gym", tint = MutantColors.TextSecondary,
@@ -68,7 +68,7 @@ fun MutantTopBar(
             onClick = onSettingsClick,
             modifier = Modifier.size(40.dp).testTag("settings_button"),
             shape = CircleShape,
-            color = MutantColors.Surface,
+            color = MutantColors.SurfaceContainer,
             border = BorderStroke(1.dp, MutantColors.Line)
         ) {
             Box(contentAlignment = Alignment.Center) {
