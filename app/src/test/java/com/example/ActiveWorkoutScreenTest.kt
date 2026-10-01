@@ -175,7 +175,9 @@ class ActiveWorkoutScreenTest {
             }
         }
         compose.onNodeWithTag("log_set_button").performScrollTo().assertTextContains("Log set 2", substring = true)
-        compose.onNodeWithTag("ad_hoc_next").performScrollTo().assertTextContains("Done · Next: Barbell Curl", substring = true).performClick()
+        // Lazy items below the fold are not composed until scrolled to.
+        compose.onNodeWithTag("active_workout_content").performScrollToNode(hasTestTag("ad_hoc_next"))
+        compose.onNodeWithTag("ad_hoc_next").assertTextContains("Done · Next: Barbell Curl", substring = true).performClick()
         assertEquals(2, selectedIndex)
         // Never marked done: the pill keeps its number.
         compose.onNodeWithTag("exercise_progress_1").assertTextContains("2", substring = true)
