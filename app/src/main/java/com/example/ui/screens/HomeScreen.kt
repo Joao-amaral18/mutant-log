@@ -46,7 +46,6 @@ import com.example.ui.components.gymTag
 import com.example.ui.designsystem.MutantColors
 import com.example.ui.designsystem.components.LocalMutantToast
 import com.example.ui.designsystem.components.MutantTopBar
-import com.example.ui.designsystem.components.MutantPrimaryButton
 import com.example.ui.designsystem.components.MutantCard
 import com.example.ui.designsystem.components.MutantCardVariant
 import com.example.ui.theme.*
