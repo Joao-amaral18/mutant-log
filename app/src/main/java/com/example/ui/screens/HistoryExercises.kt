@@ -20,12 +20,19 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.*
 import com.example.ui.designsystem.*
 import com.example.ui.designsystem.components.MutantCard
+import com.example.ui.designsystem.components.MutantChoiceChip
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 
 @Composable
 internal fun HistoryExerciseList(summaries: List<HistoryExerciseSummary>, onOpen: (Long) -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(HistoryExerciseSort.RECENT) }
-    var menu by remember { mutableStateOf(false) }
     val matching = remember(summaries, query, sort) {
         val filtered = summaries.filter { WorkoutHistory.normalize(query) in WorkoutHistory.normalize(it.exercise.name) }
         when (sort) {
@@ -35,25 +42,80 @@ internal fun HistoryExerciseList(summaries: List<HistoryExerciseSummary>, onOpen
             HistoryExerciseSort.PROGRESS -> filtered.sortedByDescending { it.progress }
         }
     }
-    LazyColumn(contentPadding = PaddingValues(MutantSpacing.md), verticalArrangement = Arrangement.spacedBy(MutantSpacing.sm), modifier = Modifier.testTag("history_exercises")) {
-        item { HistorySearch(query, { query = it }, "Search exercises…", "history_exercise_search") }
+    LazyColumn(
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.testTag("history_exercises")
+    ) {
+        item { HistorySearch(query, { query = it }, "Search exercises", "history_exercise_search") }
         item {
-            Box {
-                OutlinedButton(onClick = { menu = true }, modifier = Modifier.testTag("history_sort")) { Text(sort.label) }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    HistoryExerciseSort.entries.forEach { option -> DropdownMenuItem(text = { Text(option.label) }, onClick = { sort = option; menu = false }) }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.testTag("history_sort")) {
+                items(HistoryExerciseSort.entries) { option ->
+                    MutantChoiceChip(option.label, sort == option, { sort = option }, modifier = Modifier.testTag("history_sort_${option.name}"))
                 }
             }
         }
         if (matching.isEmpty()) item { HistoryEmpty("No exercises yet.", "Exercises from finished sessions show up here.") }
-        items(matching, key = { it.exercise.id }) { summary ->
-            MutantCard(onClick = { onOpen(summary.exercise.id) }, testTag = "history_exercise_${summary.exercise.id}") {
-                Text(summary.exercise.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("${summary.exercise.muscleGroup} · ${summary.performances.size} sessions", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
-                Spacer(Modifier.height(MutantSpacing.xs))
-                Text("Last: ${summary.latest.bestSet?.let { "${historyNumber(it.weightKg)} kg × ${it.reps}" } ?: "No work sets"}", style = MaterialTheme.typography.bodyMedium)
-                Text("Best load: ${summary.bestSet?.let { "${historyNumber(it.weightKg)} kg × ${it.reps}" } ?: "—"}", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
-                Text("e1RM: ${historyNumber(summary.e1rm)} kg", style = MaterialTheme.typography.bodySmall, color = MutantColors.Primary)
+        items(matching, key = { it.exercise.id }) { summary -> HistoryExerciseRow(summary) { onOpen(summary.exercise.id) } }
+        if (matching.isNotEmpty()) item {
+            Text("Right column: estimated 1RM (kg)", style = MutantType.MonoLabel.copy(fontWeight = FontWeight.Normal),
+                color = MutantColors.TextMetadata, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+        }
+    }
+}
+
+@Composable
+private fun HistoryExerciseRow(summary: HistoryExerciseSummary, onOpen: () -> Unit) {
+    // Oldest to newest, last eight sessions.
+    val points = summary.performances.take(8).reversed().map { it.e1rm }
+    val peak = points.maxOrNull()?.takeIf { it > 0 } ?: 1.0
+    val progress = summary.progress
+    val last = summary.latest.bestSet?.let { "${historyNumber(it.weightKg)} × ${it.reps}" } ?: "No work sets"
+    Surface(
+        onClick = onOpen,
+        shape = RoundedCornerShape(18.dp),
+        color = MutantColors.SurfaceContainer,
+        border = BorderStroke(1.dp, MutantColors.OutlineVariant),
+        modifier = Modifier.fillMaxWidth().testTag("history_exercise_${summary.exercise.id}")
+    ) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(summary.exercise.name, style = MutantType.RowTitle.copy(fontSize = 15.sp), color = MutantColors.TextPrimary,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("$last · ${summary.performances.size} sessions", style = MutantType.MonoLabel.copy(fontSize = 11.5.sp, fontWeight = FontWeight.Normal),
+                    color = MutantColors.TextSecondary, maxLines = 1)
+            }
+            Row(
+                Modifier.width(56.dp).height(28.dp).semantics { contentDescription = "e1RM trend over ${points.size} sessions" },
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                points.forEachIndexed { index, value ->
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight((value / peak).toFloat().coerceIn(0.15f, 1f))
+                            .background(if (index == points.lastIndex) MutantColors.Primary else MutantColors.Outline, RoundedCornerShape(1.dp))
+                    )
+                }
+            }
+            Column(Modifier.width(58.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(historyNumber(summary.e1rm), style = MutantType.MonoValue.copy(fontSize = 16.sp, lineHeight = 18.sp), color = MutantColors.TextPrimary)
+                Text(
+                    when {
+                        summary.performances.size < 2 -> "new"
+                        progress > 0 -> "+${historyNumber(progress)}%"
+                        else -> "${historyNumber(progress)}%"
+                    },
+                    style = MutantType.MonoLabel.copy(fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold),
+                    color = when {
+                        summary.performances.size < 2 -> MutantColors.TextMetadata
+                        progress > 0 -> MutantColors.Success
+                        progress < 0 -> MutantColors.Warning
+                        else -> MutantColors.TextMetadata
+                    }
+                )
             }
         }
     }
