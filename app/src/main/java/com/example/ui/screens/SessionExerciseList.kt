@@ -1,6 +1,10 @@
 package com.example.ui.screens
 
+import com.example.data.db.isAdHoc
+import com.example.data.db.isComplete
 import com.example.data.db.plannedSets
+import com.example.data.db.sessionSets
+import com.example.data.db.workSetCount
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -35,6 +39,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,7 +56,6 @@ import kotlin.math.roundToInt
 
 private val RevealWidth = 96.dp
 private val RemoveDistance = 170.dp
-private val MaxDrag = 220.dp
 
 /** Every exercise in today's session: jump, swipe left to remove, or add one for today only. */
 @Composable
@@ -67,7 +71,7 @@ fun SessionExerciseList(
 ) {
     val session = state.session ?: return
     val doneSets = state.exercises.sumOf { d -> d.sets.count { it.setType == SetType.WORK } }
-    val totalSets = state.exercises.sumOf { it.plannedSets }
+    val totalSets = state.exercises.sumOf { it.sessionSets }
     var revealedId by remember { mutableStateOf<Long?>(null) }
 
     Scaffold(
@@ -148,38 +152,51 @@ fun SessionExerciseList(
     }
 }
 
+/** Swipe left to reveal Remove; a long swipe removes at once. Shared by exercise rows and set rows. */
 @Composable
-private fun SwipeToRemoveRow(
+internal fun SwipeToRemoveRow(
     revealed: Boolean,
     enabled: Boolean,
     onReveal: (Boolean) -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
+    revealWidth: Dp = RevealWidth,
+    removeDistance: Dp = RemoveDistance,
+    cornerRadius: Dp = 18.dp,
+    compact: Boolean = false,
+    removeTag: String = "session_list_remove",
     content: @Composable () -> Unit
 ) {
     val density = LocalDensity.current
-    val reveal = with(density) { RevealWidth.toPx() }
-    val remove = with(density) { RemoveDistance.toPx() }
-    val max = with(density) { MaxDrag.toPx() }
+    val reveal = with(density) { revealWidth.toPx() }
+    val remove = with(density) { removeDistance.toPx() }
+    val max = with(density) { (removeDistance + 50.dp).toPx() }
     val offset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    val shape = RoundedCornerShape(cornerRadius)
     LaunchedEffect(revealed) {
         val target = if (revealed) -reveal else 0f
         if (offset.value != target && !offset.isRunning) offset.animateTo(target, tween(240))
     }
-    Box(modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))) {
+    Box(modifier.fillMaxWidth().clip(shape)) {
         if (offset.value < 0f) {
             Row(
-                Modifier.matchParentSize().background(MutantColors.Destructive, RoundedCornerShape(18.dp)),
+                Modifier.matchParentSize().background(MutantColors.Destructive, shape),
                 horizontalArrangement = Arrangement.End
             ) {
-                Column(
-                    Modifier.width(RevealWidth).fillMaxHeight().clickable(enabled = enabled, onClick = onRemove).testTag("session_list_remove"),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically)
-                ) {
-                    Icon(Icons.Outlined.Delete, contentDescription = "Remove", tint = MutantColors.OnDestructive, modifier = Modifier.size(22.dp))
-                    Text("Remove", style = MutantType.Chip.copy(fontSize = 11.sp), color = MutantColors.OnDestructive)
+                val action = Modifier.width(revealWidth).fillMaxHeight().clickable(enabled = enabled, onClick = onRemove).testTag(removeTag)
+                if (compact) {
+                    Row(action, horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Delete, contentDescription = null, tint = MutantColors.OnDestructive, modifier = Modifier.size(18.dp))
+                        Text("Remove", style = MutantType.Chip, color = MutantColors.OnDestructive)
+                    }
+                } else {
+                    Column(action, horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically)) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Remove", tint = MutantColors.OnDestructive, modifier = Modifier.size(22.dp))
+                        Text("Remove", style = MutantType.Chip.copy(fontSize = 11.sp), color = MutantColors.OnDestructive)
+                    }
                 }
             }
         }
@@ -218,9 +235,10 @@ private fun SessionExerciseRow(
     onDelete: () -> Unit
 ) {
     val exercise = detail.exercise
-    val done = detail.sets.count { it.setType == SetType.WORK }
+    val done = detail.workSetCount
     val planned = detail.plannedSets
-    val finished = done >= planned
+    val adHoc = detail.isAdHoc
+    val finished = detail.isComplete
     val started = done > 0
     val (status, statusColor) = when {
         current -> "CURRENT" to MutantColors.Primary
@@ -261,12 +279,12 @@ private fun SessionExerciseRow(
                 if (source.isNotBlank()) Text(source, style = MutantType.Caption.copy(fontSize = 11.5.sp), color = MutantColors.TextSecondary,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Box(Modifier.fillMaxWidth().height(3.dp).background(MutantColors.OutlineVariant, RoundedCornerShape(2.dp))) {
-                    Box(Modifier.fillMaxWidth((done / planned.toFloat()).coerceIn(0f, 1f)).fillMaxHeight()
+                    Box(Modifier.fillMaxWidth(if (adHoc) (if (done > 0) 1f else 0f) else (done / planned.toFloat()).coerceIn(0f, 1f)).fillMaxHeight()
                         .background(if (finished) MutantColors.Success else MutantColors.Primary, RoundedCornerShape(2.dp)))
                 }
             }
             Column(Modifier.widthIn(min = 76.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("$done/$planned", style = MutantType.MonoBody.copy(fontWeight = FontWeight.Bold), color = MutantColors.TextPrimary)
+                Text(if (adHoc) "$done set${if (done == 1) "" else "s"}" else "$done/$planned", style = MutantType.MonoBody.copy(fontWeight = FontWeight.Bold), color = MutantColors.TextPrimary)
                 Text(status, style = MutantType.Chip.copy(fontSize = 10.5.sp), color = statusColor, maxLines = 1)
             }
             IconButton(onClick = onDelete, enabled = enabled, modifier = Modifier.size(40.dp).testTag("session_list_delete_$index")) {
@@ -368,7 +386,7 @@ fun AddSessionExerciseSheet(
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Text(ex.baseName.ifBlank { ex.name }, style = MutantType.RowTitle.copy(fontSize = 15.sp), color = MutantColors.TextPrimary)
                                 Text(
-                                    listOf(ex.muscleGroup, ex.manufacturer, "${ex.defaultWorkSets}×${ex.defaultRepMin}–${ex.defaultRepMax}")
+                                    listOf(ex.muscleGroup, ex.manufacturer)
                                         .filter { it.isNotBlank() }.joinToString(" · "),
                                     style = MutantType.MonoLabel.copy(fontSize = 11.5.sp, fontWeight = FontWeight.Normal),
                                     color = MutantColors.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis

@@ -69,10 +69,13 @@ class SessionPlanTest {
             assertEquals(ReadinessInput(sleep = 2, energy = 2, soreness = 5).score, stored.readinessScore)
             assertTrue(stored.readinessStatus.contains("fatigue", ignoreCase = true))
 
-            // An ad-hoc addition falls back to the exercise defaults.
+            // An ad-hoc addition has no planned sets; rest still comes from the exercise defaults.
             val added = dao.addExerciseToActiveSession(session, exercise, 1)
             val extra = dao.getWorkoutDetailsSync(session).first { it.workoutExercise.id == added }
-            assertEquals(2, extra.plannedSets)
+            assertTrue(extra.isAdHoc)
+            assertEquals(0, extra.plannedSets)
+            assertEquals(0, extra.sessionSets)
+            assertFalse(extra.isComplete)
             assertEquals(180, extra.plannedRestSeconds)
         } finally {
             db.close()
@@ -139,6 +142,35 @@ class SessionPlanTest {
             }
         } finally {
             helper.close()
+        }
+    }
+
+    @Test
+    fun `today-only set count changes and removed sets come back with their segments`() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, MutantDatabase::class.java).allowMainThreadQueries().build()
+        try {
+            val dao = db.mutantDao()
+            val exercise = dao.insertExercise(Exercise(name = "Row", muscleGroup = "Back", defaultWorkSets = 3))
+            val session = dao.insertWorkoutSession(WorkoutSession(title = "Active"))
+            val weId = dao.insertWorkoutExercise(WorkoutExercise(workoutSessionId = session, exerciseId = exercise, orderIndex = 0, targetWorkSets = 3))
+            assertEquals(1, dao.setSessionTargetSets(weId, 2))
+            assertEquals(2, dao.getWorkoutDetailsSync(session).single().plannedSets)
+
+            val setId = dao.insertWorkoutSet(WorkoutSet(workoutExerciseId = weId, setNumber = 1, weightKg = 60f, reps = 8,
+                technique = IntensityTechnique.DROP_SET))
+            dao.insertSetSegment(SetSegment(workoutSetId = setId, segmentIndex = 0, weightKg = 40f, reps = 6))
+            val removed = dao.removeSetFromActiveSession(setId)
+            assertTrue(dao.getWorkoutDetailsSync(session).single().sets.isEmpty())
+            dao.restoreRemovedSet(removed)
+            val restored = dao.getWorkoutDetailsSync(session).single().sets.single()
+            assertEquals(setId, restored.id)
+            assertEquals(listOf(40f to 6), dao.getSegmentsForSetsSync(listOf(setId)).map { it.weightKg to it.reps })
+
+            // A finished session's plan is history and cannot change.
+            dao.updateWorkoutSession(dao.getSessionSync(session)!!.copy(finishedAt = System.currentTimeMillis()))
+            assertEquals(0, dao.setSessionTargetSets(weId, 5))
+        } finally {
+            db.close()
         }
     }
 }

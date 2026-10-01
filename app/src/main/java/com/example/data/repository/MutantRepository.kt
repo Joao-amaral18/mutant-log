@@ -231,7 +231,7 @@ class MutantRepository(private val dao: MutantDao) {
                 exerciseId = peDetail.exercise.id,
                 variantId = peDetail.programExercise.variantId,
                 orderIndex = peDetail.programExercise.orderIndex,
-                targetWorkSets = peDetail.programExercise.targetWorkSets,
+                targetWorkSets = peDetail.programExercise.targetWorkSets.coerceAtLeast(1),
                 targetRepMin = peDetail.programExercise.repMin,
                 targetRepMax = peDetail.programExercise.repMax,
                 targetRir = peDetail.programExercise.targetRir,
@@ -359,6 +359,14 @@ class MutantRepository(private val dao: MutantDao) {
     suspend fun restoreSessionExercise(removed: RemovedSessionExercise) = withContext(Dispatchers.IO) {
         dao.restoreRemovedExercise(removed)
     }
+
+    suspend fun setSessionTargetSets(workoutExerciseId: Long, sets: Int) = withContext(Dispatchers.IO) {
+        check(dao.setSessionTargetSets(workoutExerciseId, sets) == 1) { "Session is no longer active" }
+    }
+
+    suspend fun removeLoggedSet(setId: Long): RemovedSet = withContext(Dispatchers.IO) { dao.removeSetFromActiveSession(setId) }
+
+    suspend fun restoreLoggedSet(removed: RemovedSet) = withContext(Dispatchers.IO) { dao.restoreRemovedSet(removed) }
 
     suspend fun deleteSet(setId: Long) = withContext(Dispatchers.IO) {
         dao.deleteWorkoutSet(setId)

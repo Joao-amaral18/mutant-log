@@ -146,7 +146,8 @@ class WorkoutTimerService : Service() {
                 val completedSets = current?.sets?.count { it.setType == SetType.WORK } ?: 0
                 val targetSets = current?.plannedSets ?: 0
                 val setNumber = (completedSets + 1).coerceAtMost(targetSets.coerceAtLeast(1))
-                setTextViewText(R.id.notification_status, "Set $setNumber of $targetSets \u00b7 $restState")
+                setTextViewText(R.id.notification_status,
+                    if (targetSets == 0) "Set ${completedSets + 1} \u00b7 $restState" else "Set $setNumber of $targetSets \u00b7 $restState")
                 setProgressBar(R.id.notification_rest_progress, session.restRemainingSeconds.coerceAtLeast(remaining).coerceAtLeast(1), remaining, false)
                 setViewVisibility(R.id.notification_rest_progress, if (remaining > 0) View.VISIBLE else View.GONE)
                 setTextViewText(R.id.notification_label_pause, if (running) "Pause" else "Resume")

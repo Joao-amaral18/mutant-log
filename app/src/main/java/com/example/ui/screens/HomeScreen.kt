@@ -1,6 +1,6 @@
 package com.example.ui.screens
 
-import com.example.data.db.plannedSets
+import com.example.data.db.sessionSets
 import com.example.ui.designsystem.MutantStrokeWidths
 
 import com.example.ui.designsystem.MutantTracking
@@ -164,7 +164,7 @@ fun HomeScreen(
             }
         } else {
             item(key = "next_card") {
-                val totalSets = activeUiState.exercises.sumOf { it.plannedSets }
+                val totalSets = activeUiState.exercises.sumOf { it.sessionSets }
                 val doneSets = activeUiState.exercises.sumOf { detail -> detail.sets.count { it.setType == SetType.WORK } }
                 NextWorkoutCard(
                     todayLabel = todayLabel(nowMillis),

@@ -13,6 +13,9 @@ import com.example.data.db.WorkoutExerciseDetail
 import com.example.data.db.plannedRir
 import com.example.data.db.repMax
 import com.example.data.db.repMin
+import com.example.data.db.plannedSets
+import com.example.data.db.isAdHoc
+import com.example.data.db.workSetCount
 import com.example.data.model.*
 import com.example.data.repository.AnalysisExportRepository
 import com.example.data.repository.AnalysisExportRepositoryImpl
@@ -66,7 +69,10 @@ data class ActiveWorkoutUiState(
     val restTimerRecommended: String = "2–3 min",
     val restTimerTotalSeconds: Int = 0,
     // Work sets from the last finished session of the current exercise.
-    val previousWorkSets: List<WorkoutSet> = emptyList()
+    val previousWorkSets: List<WorkoutSet> = emptyList(),
+    // The same for the exercise after the current one, for the Up next card.
+    val nextProgression: ProgressionRecommendation? = null,
+    val nextPreviousWorkSets: List<WorkoutSet> = emptyList()
 )
 
 class MutantViewModel(application: Application) : AndroidViewModel(application) {
@@ -262,7 +268,9 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                             isLoading = it.isLoading || it.session?.id != session.id,
                             exercises = if (it.session?.id == session.id) it.exercises else emptyList(),
                             currentProgression = if (sameExercise) it.currentProgression else null,
-                            previousWorkSets = if (sameExercise) it.previousWorkSets else emptyList())
+                            previousWorkSets = if (sameExercise) it.previousWorkSets else emptyList(),
+                            nextProgression = if (sameExercise) it.nextProgression else null,
+                            nextPreviousWorkSets = if (sameExercise) it.nextPreviousWorkSets else emptyList())
                     }
                     refreshClock()
                     if (notifiedSessionId != session.id) {
@@ -320,9 +328,21 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                 incrementKg = currentEx.defaultIncrementKg
             )
             val previous = repository.getPreviousWorkSets(currentEx.id)
+            val nextDetail = state.exercises.getOrNull(state.currentExerciseIndex + 1)
+            val nextRecommendation = nextDetail?.let { next ->
+                repository.getProgressionSuggestion(
+                    exerciseId = next.exercise.id,
+                    repMin = next.repMin,
+                    repMax = next.repMax,
+                    targetRir = next.plannedRir,
+                    incrementKg = next.exercise.defaultIncrementKg
+                )
+            }
+            val nextPrevious = nextDetail?.let { repository.getPreviousWorkSets(it.exercise.id) } ?: emptyList()
             _activeWorkoutUiState.update {
                 if (it.session?.id == state.session?.id && it.currentExerciseIndex == state.currentExerciseIndex) {
-                    it.copy(currentProgression = recommendation, previousWorkSets = previous)
+                    it.copy(currentProgression = recommendation, previousWorkSets = previous,
+                        nextProgression = nextRecommendation, nextPreviousWorkSets = nextPrevious)
                 } else it
             }
         }
@@ -548,6 +568,74 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                 throw e
             } catch (e: Exception) {
                 onError("Could not restore the exercise.")
+            }
+        }
+    }
+
+    // Set edits keep a single undo step, like exercise removal.
+    private var lastSetUndo: (suspend () -> Unit)? = null
+
+    /** Deletes a logged set; [onRemoved] runs on success and [undoSetChange] puts it back. */
+    fun removeLoggedSet(setId: Long, onRemoved: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        launchWorkoutMutation {
+            try {
+                val removed = repository.removeLoggedSet(setId)
+                lastSetUndo = { repository.restoreLoggedSet(removed) }
+                refreshLibraryCounts()
+                onRemoved()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onError("Could not remove the set.")
+            }
+        }
+    }
+
+    /** Drops one not-yet-logged set from today's plan. Keeps at least one set and every logged one. */
+    fun removePlannedSet(workoutExerciseId: Long, onRemoved: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        val detail = _activeWorkoutUiState.value.exercises.firstOrNull { it.workoutExercise.id == workoutExerciseId } ?: return
+        val planned = detail.plannedSets
+        if (detail.isAdHoc || planned <= maxOf(1, detail.workSetCount)) return
+        launchWorkoutMutation {
+            try {
+                repository.setSessionTargetSets(workoutExerciseId, planned - 1)
+                lastSetUndo = { repository.setSessionTargetSets(workoutExerciseId, planned) }
+                onRemoved()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onError("Could not remove the set.")
+            }
+        }
+    }
+
+    /** Adds one set to today's plan for this exercise. */
+    fun addPlannedSet(workoutExerciseId: Long, onError: (String) -> Unit = {}) {
+        val detail = _activeWorkoutUiState.value.exercises.firstOrNull { it.workoutExercise.id == workoutExerciseId } ?: return
+        if (detail.isAdHoc) return
+        val sets = maxOf(detail.plannedSets, detail.workSetCount) + 1
+        launchWorkoutMutation {
+            try {
+                repository.setSessionTargetSets(workoutExerciseId, sets)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onError("Could not add a set.")
+            }
+        }
+    }
+
+    fun undoSetChange(onError: (String) -> Unit = {}) {
+        val undo = lastSetUndo ?: return
+        lastSetUndo = null
+        launchWorkoutMutation {
+            try {
+                undo()
+                refreshLibraryCounts()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onError("Could not undo.")
             }
         }
     }

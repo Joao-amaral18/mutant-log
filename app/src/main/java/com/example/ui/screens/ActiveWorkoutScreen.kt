@@ -1,6 +1,6 @@
 package com.example.ui.screens
 
-import com.example.data.db.plannedSets
+import com.example.data.db.sessionSets
 import com.example.data.db.repMin
 import com.example.data.db.repMax
 import com.example.data.db.plannedRir
@@ -217,7 +217,7 @@ fun ActiveWorkoutScreen(
             title = session.title,
             elapsedMinutes = state.elapsedSeconds / 60,
             doneSets = loggedSets,
-            totalSets = state.exercises.sumOf { it.plannedSets },
+            totalSets = state.exercises.sumOf { it.sessionSets },
             volumeKg = volume,
             initialBodyweight = lastFinished?.bodyweight,
             lastBodyweightNote = lastFinished?.takeIf { it.bodyweight > 0f }?.let { last ->
@@ -351,7 +351,17 @@ fun ActiveWorkoutScreen(
             if (it == IntensityTechnique.REST_PAUSE || it == IntensityTechnique.DROP_SET) showIntensityDialog = true
         },
         onEditSegments = { showIntensityDialog = true },
-        onDeleteSet = viewModel::deleteSet,
+        onRemoveSet = { setId ->
+            viewModel.removeLoggedSet(setId,
+                onRemoved = { toast.show("Set removed", "Undo") { viewModel.undoSetChange { toast.show(it) } } },
+                onError = { toast.show(it) })
+        },
+        onRemovePlannedSet = {
+            viewModel.removePlannedSet(workoutExercise.id,
+                onRemoved = { toast.show("Set removed from today", "Undo") { viewModel.undoSetChange { toast.show(it) } } },
+                onError = { toast.show(it) })
+        },
+        onAddSet = { viewModel.addPlannedSet(workoutExercise.id) { toast.show(it) } },
         onOpenList = { listOpen = true },
         onLogSet = {
             val weight = weightInput.toFloatOrNull()

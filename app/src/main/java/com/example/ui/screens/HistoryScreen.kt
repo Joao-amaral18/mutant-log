@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -220,8 +221,14 @@ private fun HistoryTimeline(workouts: List<HistoryWorkout>, onOpen: (Long) -> Un
             items(sessions, key = { it.session.id }) { HistorySessionCard(it) { onOpen(it.session.id) } }
         }
         if (!searching && workouts.any { historyDate(it.session.startedAt, "yyyy-MM") < historyDate(month.timeInMillis, "yyyy-MM") }) item {
-            MutantButton("Previous month", onClick = { monthOffset-- }, style = MutantButtonStyle.Surface, height = 48.dp,
-                textStyle = MutantType.ButtonSmall, modifier = Modifier.fillMaxWidth().testTag("history_older"))
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                TextButton(onClick = { monthOffset-- }, contentPadding = PaddingValues(horizontal = 12.dp),
+                    modifier = Modifier.height(44.dp).testTag("history_older")) {
+                    Icon(Icons.Rounded.ChevronLeft, contentDescription = null, tint = MutantColors.Primary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Previous month", style = MutantType.ButtonSmall.copy(fontWeight = FontWeight.SemiBold), color = MutantColors.Primary)
+                }
+            }
         }
     }
 }
