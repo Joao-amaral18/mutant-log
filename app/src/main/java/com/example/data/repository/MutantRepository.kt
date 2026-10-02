@@ -15,7 +15,9 @@ data class ReadinessInput(
     val soreness: Int = 2,
     val jointDiscomfort: String = "None",
     val motivation: Int = 5
-)
+) {
+    val score: Int get() = readinessScore(sleep, energy, soreness, jointDiscomfort, motivation)
+}
 
 data class LibraryCounts(
     val exerciseCount: Int = 124,
@@ -217,7 +219,8 @@ class MutantRepository(private val dao: MutantDao) {
             sorenessScore = readiness.soreness,
             jointDiscomfort = readiness.jointDiscomfort,
             motivationScore = readiness.motivation,
-            readinessStatus = calculatedStatus
+            readinessStatus = calculatedStatus,
+            readinessScore = readiness.score
         )
 
         // Pre-populate workout exercises from program day
@@ -228,6 +231,11 @@ class MutantRepository(private val dao: MutantDao) {
                 exerciseId = peDetail.exercise.id,
                 variantId = peDetail.programExercise.variantId,
                 orderIndex = peDetail.programExercise.orderIndex,
+                targetWorkSets = peDetail.programExercise.targetWorkSets.coerceAtLeast(1),
+                targetRepMin = peDetail.programExercise.repMin,
+                targetRepMax = peDetail.programExercise.repMax,
+                targetRir = peDetail.programExercise.targetRir,
+                restSeconds = peDetail.programExercise.restSeconds,
                 seatPosition = peDetail.exercise.seatPosition,
                 handlePosition = peDetail.exercise.handlePosition,
                 notes = peDetail.exercise.notes,
@@ -257,7 +265,8 @@ class MutantRepository(private val dao: MutantDao) {
             sorenessScore = readiness.soreness,
             jointDiscomfort = readiness.jointDiscomfort,
             motivationScore = readiness.motivation,
-            readinessStatus = calculatedStatus
+            readinessStatus = calculatedStatus,
+            readinessScore = readiness.score
         )
 
         val exercises = exerciseIds.mapIndexed { index, exId ->
@@ -283,7 +292,8 @@ class MutantRepository(private val dao: MutantDao) {
         val isEnergyLow = r.energy <= 2 || r.sleep <= 2
         val isSorenessHigh = r.soreness >= 4
 
-        return if (isJointHigh || (isEnergyLow && isSorenessHigh)) {
+        val lowScore = readinessBand(r.score) == ReadinessBand.HIGH_FATIGUE
+        return if (isJointHigh || (isEnergyLow && isSorenessHigh) || lowScore) {
             "Accumulated fatigue detected"
         } else {
             "Normal"
@@ -349,6 +359,14 @@ class MutantRepository(private val dao: MutantDao) {
     suspend fun restoreSessionExercise(removed: RemovedSessionExercise) = withContext(Dispatchers.IO) {
         dao.restoreRemovedExercise(removed)
     }
+
+    suspend fun setSessionTargetSets(workoutExerciseId: Long, sets: Int) = withContext(Dispatchers.IO) {
+        check(dao.setSessionTargetSets(workoutExerciseId, sets) == 1) { "Session is no longer active" }
+    }
+
+    suspend fun removeLoggedSet(setId: Long): RemovedSet = withContext(Dispatchers.IO) { dao.removeSetFromActiveSession(setId) }
+
+    suspend fun restoreLoggedSet(removed: RemovedSet) = withContext(Dispatchers.IO) { dao.restoreRemovedSet(removed) }
 
     suspend fun deleteSet(setId: Long) = withContext(Dispatchers.IO) {
         dao.deleteWorkoutSet(setId)

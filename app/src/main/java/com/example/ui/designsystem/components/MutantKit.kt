@@ -236,6 +236,46 @@ private fun StepperButton(icon: ImageVector, description: String, onClick: () ->
     ) { Icon(icon, contentDescription = description, modifier = Modifier.size(22.dp)) }
 }
 
+/** Labelled text input in the sheet style: dark well, line border, eyebrow label. */
+@Composable
+fun MutantTextField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "",
+    singleLine: Boolean = true,
+    minHeight: Dp = 52.dp,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    enabled: Boolean = true,
+    testTag: String? = null
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        MutantEyebrow(label, modifier = Modifier.padding(start = 4.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = minHeight)
+                .background(MutantColors.Background, MutantShapeTokens.Panel)
+                .border(1.dp, MutantColors.Line, MutantShapeTokens.Panel)
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart
+        ) {
+            BasicTextField(
+                value = value, onValueChange = onValueChange, enabled = enabled, singleLine = singleLine,
+                textStyle = MutantType.Body.copy(color = MutantColors.TextPrimary),
+                cursorBrush = SolidColor(MutantColors.Primary),
+                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                modifier = Modifier.fillMaxWidth().then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
+                decorationBox = { inner ->
+                    if (value.isEmpty() && placeholder.isNotEmpty()) Text(placeholder, style = MutantType.Body, color = MutantColors.TextMetadata)
+                    inner()
+                }
+            )
+        }
+    }
+}
+
 /** The redesign's bottom sheet: dark surface, 30dp top corners, short handle, heavy scrim. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

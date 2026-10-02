@@ -127,7 +127,7 @@ internal object RestTimerAlerts {
         cancelCompletion(context)
         val notification = NotificationCompat.Builder(context, ALARM_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("REST COMPLETE")
+            .setContentTitle("Rest complete")
             .setContentText("Ready for your next set.")
             .setContentIntent(activityIntent(context, ALARM_NOTIFICATION_ID))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

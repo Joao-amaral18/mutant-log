@@ -21,6 +21,7 @@ import com.example.data.model.*
 import com.example.ui.designsystem.*
 import com.example.ui.designsystem.components.MutantCard
 import com.example.ui.designsystem.components.MutantChoiceChip
+import com.example.ui.designsystem.components.MutantEyebrow
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -127,39 +128,42 @@ internal fun HistoryExerciseDetail(summary: HistoryExerciseSummary, onBack: () -
     var allRecords by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().testTag("history_exercise_detail")) {
         HistoryHeader(summary.exercise.name, onBack)
-        LazyColumn(contentPadding = PaddingValues(MutantSpacing.md), verticalArrangement = Arrangement.spacedBy(MutantSpacing.md)) {
+        LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(MutantSpacing.md)) {
             item {
                 HistoryMetrics(listOf("Last performance" to (summary.latest.bestSet?.let { "${historyNumber(it.weightKg)} kg × ${it.reps}" } ?: "—"), "Best load" to (summary.bestSet?.let { "${historyNumber(it.weightKg)} kg × ${it.reps}" } ?: "—"), "Estimated e1RM" to "${historyNumber(summary.e1rm)} kg", "Sessions" to summary.performances.size.toString()))
             }
             item {
-                Text("PROGRESS", style = MaterialTheme.typography.labelLarge, color = MutantColors.TextSecondary)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(MutantSpacing.xs)) {
-                    items(listOf("e1RM", "Load", "Volume", "Reps")) { option -> FilterChip(selected = metric == option, onClick = { metric = option }, label = { Text(option) }, modifier = Modifier.testTag("history_metric_$option")) }
+                MutantEyebrow("PROGRESS", modifier = Modifier.padding(bottom = 8.dp), style = MutantType.Eyebrow.copy(fontSize = 10.5.sp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(listOf("e1RM", "Load", "Volume", "Reps")) { option ->
+                        MutantChoiceChip(option, metric == option, { metric = option }, modifier = Modifier.testTag("history_metric_$option"))
+                    }
                 }
                 val points = summary.performances.reversed().map { p -> when (metric) { "Load" -> p.bestSet?.weightKg?.toDouble() ?: 0.0; "Volume" -> p.volume; "Reps" -> p.reps.toDouble(); else -> p.e1rm } }
                 val unit = if (metric == "Reps") "reps" else "kg"
                 HistoryEvolutionChart(points, metric, unit)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(historyDate(summary.performances.last().workout.session.startedAt, "dd/MM/yy"), style = MaterialTheme.typography.labelSmall, color = MutantColors.TextSecondary)
-                    Text(historyDate(summary.latest.workout.session.startedAt, "dd/MM/yy"), style = MaterialTheme.typography.labelSmall, color = MutantColors.TextSecondary)
+                    Text(historyDate(summary.performances.last().workout.session.startedAt, "MMM d"), style = MutantType.MonoLabel, color = MutantColors.TextSecondary)
+                    Text(historyDate(summary.latest.workout.session.startedAt, "MMM d"), style = MutantType.MonoLabel, color = MutantColors.TextSecondary)
                 }
                 if (metric == "e1RM") Text("Epley estimate: load × (1 + reps / 30). Work sets only; segments are not counted.", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary, modifier = Modifier.padding(top = MutantSpacing.xs))
             }
-            item { Text("PERSONAL RECORDS", style = MaterialTheme.typography.labelLarge, color = MutantColors.TextSecondary) }
+            item { MutantEyebrow("PERSONAL RECORDS", style = MutantType.Eyebrow.copy(fontSize = 10.5.sp)) }
             val records = summary.performances.flatMap { performance -> performance.sets.filter { it.set.isPr }.map { performance.workout to it } }
-            if (records.isEmpty()) item { Text("No PRs yet.", color = MutantColors.TextSecondary) }
+            if (records.isEmpty()) item { Text("No PRs yet.", style = MutantType.BodySmall, color = MutantColors.TextSecondary) }
             items(if (allRecords) records else records.take(3), key = { "pr-${it.second.set.id}" }) { (workout, set) ->
                 MutantCard(onClick = { onSession(workout.session.id) }) {
-                    Text("${historyDate(workout.session.startedAt, "dd/MM/yyyy")} · ${workout.session.title}", style = MaterialTheme.typography.labelLarge)
+                    Text("${historyDate(workout.session.startedAt, "EEE MMM d")} · ${workout.session.title}", style = MutantType.ButtonSmall, color = MutantColors.TextPrimary)
                     HistorySetDetails(set)
                 }
             }
-            if (records.size > 3) item { TextButton(onClick = { allRecords = !allRecords }) { Text(if (allRecords) "Show fewer records" else "See all ${records.size} PRs") } }
-            item { Text("SET HISTORY", style = MaterialTheme.typography.labelLarge, color = MutantColors.TextSecondary) }
+            if (records.size > 3) item { TextButton(onClick = { allRecords = !allRecords }) { Text(if (allRecords) "Show fewer records" else "See all ${records.size} PRs", style = MutantType.ButtonSmall, color = MutantColors.Primary) } }
+            item { MutantEyebrow("SET HISTORY", style = MutantType.Eyebrow.copy(fontSize = 10.5.sp)) }
             items(summary.performances, key = { "session-${it.workout.session.id}" }) { performance ->
                 MutantCard(onClick = { onSession(performance.workout.session.id) }, testTag = "history_exercise_session_${performance.workout.session.id}") {
-                    Text("${historyDate(performance.workout.session.startedAt, "dd MMM yyyy").uppercase(historyLocale)} · ${performance.workout.session.title} ›", fontWeight = FontWeight.Bold)
-                    Text("${performance.sets.size} sets · ${historyNumber(performance.volume)} kg", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
+                    Text("${performance.workout.session.title} ›", style = MutantType.Title, color = MutantColors.TextPrimary)
+                    Text("${historyDate(performance.workout.session.startedAt, "EEE MMM d, yyyy")} · ${performance.sets.size} sets · ${historyNumber(performance.volume)} kg",
+                        style = MutantType.Caption, color = MutantColors.TextSecondary, modifier = Modifier.padding(top = 4.dp))
                     performance.entries.forEach { entry ->
                         if (entry.workoutExercise.notes.isNotBlank()) Text(entry.workoutExercise.notes, color = MutantColors.TextSecondary)
                         entry.sets.forEach { set -> Spacer(Modifier.height(MutantSpacing.xs)); HistorySetDetails(set) }
@@ -174,7 +178,7 @@ internal fun HistoryExerciseDetail(summary: HistoryExerciseSummary, onBack: () -
 private fun HistoryEvolutionChart(points: List<Double>, metric: String, unit: String) {
     val min = points.minOrNull() ?: 0.0
     val max = points.maxOrNull() ?: 0.0
-    Text("${historyNumber(min)}–${historyNumber(max)} $unit · ${points.size} sessions", style = MaterialTheme.typography.labelMedium, color = MutantColors.TextSecondary)
+    Text("${historyNumber(min)}–${historyNumber(max)} $unit · ${points.size} sessions", style = MutantType.MonoLabel, color = MutantColors.TextSecondary, modifier = Modifier.padding(top = 10.dp))
     Canvas(Modifier.fillMaxWidth().height(180.dp).padding(vertical = MutantSpacing.sm).semantics { contentDescription = "$metric: ${points.joinToString { historyNumber(it) }} $unit, first to last session" }) {
         val inset = 6.dp.toPx()
         val width = size.width - inset * 2

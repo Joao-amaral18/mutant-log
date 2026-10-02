@@ -113,6 +113,7 @@ fun NextWorkoutCard(
     lastTitle: String?,
     lastDaysAgo: Int?,
     recoveryText: String,
+    readinessScore: Int?,
     activeSession: ActiveSessionProgress?,
     isStarting: Boolean,
     startError: String?,
@@ -150,7 +151,7 @@ fun NextWorkoutCard(
                     MutantStat("LAST", lastTitle ?: "None yet", Modifier.weight(1f),
                         caption = relativeDays(lastDaysAgo).ifBlank { "log a session" })
                     MutantStat("RECOVERY", recoveryText, Modifier.weight(1f), caption = "since last session")
-                    MutantStat("FATIGUE", fatigueLabel, Modifier.weight(1f), caption = "last check-in",
+                    MutantStat("FATIGUE", fatigueLabel, Modifier.weight(1f), caption = readinessScore?.let { "readiness $it" } ?: "last check-in",
                         valueColor = if (isRecovered) MutantColors.Success else MutantColors.Warning)
                 }
             }

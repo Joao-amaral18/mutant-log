@@ -1,5 +1,15 @@
 package com.example.ui.screens
 
+import com.example.data.db.plannedSets
+import com.example.data.db.isAdHoc
+import com.example.data.db.isComplete
+import com.example.data.db.sessionSets
+import com.example.data.db.workSetCount
+import com.example.data.db.repMin
+import com.example.data.db.repMax
+import com.example.data.db.plannedRir
+import com.example.data.db.plannedRestSeconds
+import com.example.data.db.WorkoutExerciseDetail
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -22,6 +32,8 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.SportsScore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,17 +72,27 @@ fun platesPerSide(totalKg: Float): String {
             perSide -= plate
         }
     }
-    return if (plates.isEmpty()) "Empty bar (20 kg)" else "Plates per side (20 kg bar): ${plates.joinToString(" + ")}"
+    return if (plates.isEmpty()) "Empty bar (20 kg)" else "Plates per side: ${plates.joinToString(" + ")} kg · 20 kg bar"
 }
 
 /** Load and reps to aim for today, from the double-progression recommendation. */
-fun targetFor(progression: ProgressionRecommendation?, previous: List<WorkoutSet>, exercise: Exercise): Pair<Float, Int>? {
+fun targetFor(progression: ProgressionRecommendation?, previous: List<WorkoutSet>, detail: WorkoutExerciseDetail): Pair<Float, Int>? {
     if (progression == null || progression.status == ProgressionStatus.FIRST_TIME) return null
     val reps = when (progression.status) {
-        ProgressionStatus.INCREASE_LOAD -> exercise.defaultRepMin
-        else -> ((previous.minOfOrNull { it.reps } ?: exercise.defaultRepMin) + 1).coerceIn(exercise.defaultRepMin, exercise.defaultRepMax)
+        ProgressionStatus.INCREASE_LOAD -> detail.repMin
+        else -> ((previous.minOfOrNull { it.reps } ?: detail.repMin) + 1).coerceIn(detail.repMin, detail.repMax)
     }
     return progression.suggestedWeightKg to reps
+}
+
+/** Target for each planned set: +1 rep on each previous set until the top of the range, reset after a load increase. */
+fun perSetTargets(progression: ProgressionRecommendation?, previous: List<WorkoutSet>, detail: WorkoutExerciseDetail): List<Pair<Float, Int>> {
+    val target = targetFor(progression, previous, detail) ?: return emptyList()
+    return (0 until detail.plannedSets).map { index ->
+        val reps = if (progression?.status == ProgressionStatus.INCREASE_LOAD) detail.repMin
+        else ((previous.getOrNull(index)?.reps ?: (target.second - 1)) + 1).coerceIn(detail.repMin, detail.repMax)
+        target.first to reps
+    }
 }
 
 private fun techniqueBadge(technique: IntensityTechnique): String? = when (technique) {
@@ -109,7 +131,9 @@ fun ActiveWorkoutContent(
     onEditSegments: () -> Unit,
     onLogSet: () -> Unit,
     modifier: Modifier = Modifier,
-    onDeleteSet: (Long) -> Unit = {},
+    onRemoveSet: (Long) -> Unit = {},
+    onRemovePlannedSet: () -> Unit = {},
+    onAddSet: () -> Unit = {},
     onOpenList: () -> Unit = {},
     setupEditor: @Composable () -> Unit = {},
     restTimer: @Composable () -> Unit = {}
@@ -120,14 +144,16 @@ fun ActiveWorkoutContent(
     val workSets = detail.sets.filter { it.setType == SetType.WORK }
     val warmups = detail.sets.filter { it.setType == SetType.WARMUP }
     val doneSets = state.exercises.sumOf { d -> d.sets.count { it.setType == SetType.WORK } }
-    val totalSets = state.exercises.sumOf { it.exercise.defaultWorkSets }.coerceAtLeast(1)
+    val totalSets = state.exercises.sumOf { it.sessionSets }.coerceAtLeast(1)
+    val adHoc = detail.isAdHoc
+    val last = state.currentExerciseIndex >= state.exercises.lastIndex
+    val nextDetail = state.exercises.getOrNull(state.currentExerciseIndex + 1)
+    val nextLabel = nextDetail?.let { "Next: ${it.exercise.baseName.ifBlank { it.exercise.name }}" } ?: "Finish workout"
+    val onNext = { if (nextDetail == null) onFinish() else onSelectExercise(state.currentExerciseIndex + 1) }
 
     var setupOpen by remember(detail.workoutExercise.id) { mutableStateOf(false) }
-    var extraSet by remember(detail.workoutExercise.id) { mutableStateOf(false) }
-    val complete = workSets.size >= exercise.defaultWorkSets
-    val showLogger = !complete || extraSet || setType == SetType.WARMUP
-    // A logged extra set returns the exercise to its done state.
-    LaunchedEffect(workSets.size) { extraSet = false }
+    val complete = detail.isComplete
+    val showLogger = !complete || setType == SetType.WARMUP
 
     Scaffold(
         modifier = modifier.fillMaxSize().imePadding(),
@@ -146,19 +172,23 @@ fun ActiveWorkoutContent(
                             tint = MutantColors.TextSecondary, modifier = Modifier.size(26.dp))
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(session.title, style = MutantType.Title, color = MutantColors.TextPrimary,
+                        Text(session.title, style = MutantType.Title.copy(lineHeight = 20.sp), color = MutantColors.TextPrimary,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("${formatClock(state.elapsedSeconds)} · $doneSets/$totalSets sets",
                             style = MutantType.MonoLabel, color = MutantColors.TextSecondary)
                     }
-                    OutlinedButton(
+                    Surface(
                         onClick = onFinish, enabled = enabled,
-                        modifier = Modifier.height(40.dp).testTag("finish_workout"),
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        border = BorderStroke(1.dp, if (enabled) MutantColors.Primary else MutantColors.Line),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MutantColors.Primary)
-                    ) { Text("Finish", style = MutantType.ButtonSmall.copy(fontWeight = FontWeight.Bold)) }
+                        modifier = Modifier.size(44.dp).testTag("finish_workout"),
+                        shape = CircleShape,
+                        color = Color.Transparent,
+                        contentColor = if (enabled) MutantColors.Primary else MutantColors.TextMetadata,
+                        border = BorderStroke(1.dp, if (enabled) MutantColors.Primary else MutantColors.Line)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.SportsScore, contentDescription = "Finish session", modifier = Modifier.size(24.dp))
+                        }
+                    }
                 }
                 ProgressTrack(doneSets / totalSets.toFloat(), Modifier.padding(start = 20.dp, end = 20.dp, top = 10.dp))
                 Row(
@@ -190,7 +220,7 @@ fun ActiveWorkoutContent(
                             number = index + 1,
                             label = item.exercise.baseName.ifBlank { item.exercise.name },
                             current = index == state.currentExerciseIndex,
-                            finished = item.sets.count { it.setType == SetType.WORK } >= item.exercise.defaultWorkSets,
+                            finished = item.isComplete,
                             enabled = enabled,
                             onClick = { onSelectExercise(index) },
                             modifier = Modifier.testTag("exercise_progress_$index")
@@ -215,14 +245,20 @@ fun ActiveWorkoutContent(
                     Text(exercise.baseName.ifBlank { exercise.name }, style = MutantType.DisplayMedium, color = MutantColors.TextPrimary,
                         modifier = Modifier.testTag("exercise_name"))
                     Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SpecChip("${exercise.defaultWorkSets} × ${exercise.defaultRepMin}–${exercise.defaultRepMax}")
-                        SpecChip("RIR ${exercise.defaultRir}")
-                        SpecChip(restLabel(exercise.defaultRestSeconds), withTimer = true)
+                        if (adHoc) {
+                            Text("Added today · no plan", style = MutantType.Chip, color = MutantColors.Primary,
+                                modifier = Modifier.height(26.dp).background(MutantColors.PrimarySelected, RoundedCornerShape(8.dp))
+                                    .wrapContentHeight().padding(horizontal = 10.dp).testTag("ad_hoc_chip"))
+                        } else {
+                            SpecChip("${detail.plannedSets} × ${detail.repMin}–${detail.repMax}")
+                            SpecChip("RIR ${detail.plannedRir}")
+                        }
+                        SpecChip(restLabel(detail.plannedRestSeconds), withTimer = true)
                     }
                 }
             }
             item(key = "target") {
-                val target = targetFor(state.currentProgression, state.previousWorkSets, exercise)
+                val target = if (adHoc) null else targetFor(state.currentProgression, state.previousWorkSets, detail)
                 Surface(
                     onClick = onTarget,
                     modifier = Modifier.fillMaxWidth().testTag("target_banner"),
@@ -235,7 +271,7 @@ fun ActiveWorkoutContent(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             MutantEyebrow("TODAY’S TARGET", color = MutantColors.Primary)
                             Text(
-                                target?.let { "${loadLabel(it.first)} kg × ${it.second}" } ?: "Set a baseline",
+                                target?.let { "${loadLabel(it.first)} kg × ${it.second}" } ?: if (adHoc) "Log as you go" else "Set a baseline",
                                 style = MutantType.MonoValue, color = MutantColors.TextPrimary
                             )
                             Text(
@@ -262,16 +298,17 @@ fun ActiveWorkoutContent(
             item(key = "sets") {
                 SetTable(
                     warmups = warmups, workSets = workSets, previous = state.previousWorkSets,
-                    plannedSets = exercise.defaultWorkSets,
+                    plannedSets = detail.plannedSets, adHoc = adHoc,
+                    targets = perSetTargets(state.currentProgression, state.previousWorkSets, detail),
                     draftActive = showLogger && setType == SetType.WORK,
                     draftWeight = weightValue, draftReps = repsValue, draftRir = rir,
-                    enabled = enabled, onDelete = onDeleteSet
+                    enabled = enabled, onRemoveSet = onRemoveSet, onRemovePlannedSet = onRemovePlannedSet, onAddSet = onAddSet
                 )
             }
             if (showLogger) {
                 item(key = "logger") {
                     SetLogger(
-                        exercise = exercise, workSetCount = workSets.size,
+                        exercise = exercise, plannedSets = detail.plannedSets, workSetCount = workSets.size,
                         weightValue = weightValue, repsValue = repsValue, setType = setType, rir = rir,
                         technique = technique, segments = segments, enabled = enabled,
                         onWeightChange = onWeightChange, onRepsChange = onRepsChange,
@@ -279,9 +316,16 @@ fun ActiveWorkoutContent(
                         onTechniqueChange = onTechniqueChange, onEditSegments = onEditSegments, onLogSet = onLogSet
                     )
                 }
+                if (adHoc && workSets.isNotEmpty()) {
+                    item(key = "ad_hoc_done") {
+                        MutantButton("Done · $nextLabel", onClick = onNext, enabled = enabled, style = MutantButtonStyle.Outline,
+                            height = 52.dp, textStyle = MutantType.Button.copy(fontSize = 15.sp),
+                            trailingIcon = Icons.AutoMirrored.Rounded.ArrowForward,
+                            modifier = Modifier.fillMaxWidth().testTag("ad_hoc_next"))
+                    }
+                }
             } else {
                 item(key = "exercise_done") {
-                    val last = state.currentExerciseIndex >= state.exercises.lastIndex
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically) {
@@ -289,24 +333,60 @@ fun ActiveWorkoutContent(
                             Spacer(Modifier.width(8.dp))
                             Text("Exercise done", style = MutantType.ButtonSmall, color = MutantColors.Success)
                         }
-                        if (last) {
-                            MutantButton("Finish workout", onClick = onFinish, enabled = enabled,
-                                trailingIcon = Icons.AutoMirrored.Rounded.ArrowForward,
-                                modifier = Modifier.fillMaxWidth().testTag("complete_session"))
-                        } else {
-                            val next = state.exercises[state.currentExerciseIndex + 1].exercise
-                            MutantButton("Next: ${next.baseName.ifBlank { next.name }}",
-                                onClick = { onSelectExercise(state.currentExerciseIndex + 1) }, enabled = enabled,
-                                trailingIcon = Icons.AutoMirrored.Rounded.ArrowForward,
-                                modifier = Modifier.fillMaxWidth().testTag("next_exercise"))
-                        }
-                        MutantButton("+ Extra set", onClick = { extraSet = true }, style = MutantButtonStyle.Quiet,
-                            enabled = enabled, height = 44.dp, textStyle = MutantType.ButtonSmall,
-                            modifier = Modifier.fillMaxWidth().testTag("extra_set"))
+                        if (nextDetail != null) UpNextCard(nextDetail, state.nextProgression, state.nextPreviousWorkSets)
+                        MutantButton(nextLabel, onClick = onNext, enabled = enabled,
+                            trailingIcon = Icons.AutoMirrored.Rounded.ArrowForward,
+                            modifier = Modifier.fillMaxWidth().testTag(if (last) "complete_session" else "next_exercise"))
                     }
                 }
             }
         }
+    }
+}
+
+/** What comes after the finished exercise, so the user can walk over and set up while resting. */
+@Composable
+private fun UpNextCard(next: WorkoutExerciseDetail, progression: ProgressionRecommendation?, previous: List<WorkoutSet>) {
+    val exercise = next.exercise
+    val source = exercise.manufacturer.ifBlank { exercise.muscleGroup }
+    val seat = next.workoutExercise.seatPosition.ifBlank { exercise.seatPosition }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(MutantColors.SurfaceContainer, RoundedCornerShape(18.dp))
+            .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(18.dp))
+            .padding(16.dp)
+            .testTag("up_next_card"),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            MutantEyebrow(if (source.isBlank()) "UP NEXT" else "UP NEXT · ${source.uppercase()}")
+            Text(exercise.baseName.ifBlank { exercise.name }, style = MutantType.Title.copy(fontSize = 19.sp, lineHeight = 22.sp),
+                color = MutantColors.TextPrimary)
+        }
+        val target = targetFor(progression, previous, next)
+        val stats = listOf(
+            "TARGET" to when {
+                next.isAdHoc -> "Open"
+                target != null -> "${loadLabel(target.first)} × ${target.second}"
+                else -> "Baseline"
+            },
+            "SETS" to if (next.isAdHoc) "Open" else "${next.plannedSets} × ${next.repMin}–${next.repMax}",
+            "SETUP" to (seat.takeIf { it.isNotBlank() }?.let { if (it.startsWith("seat", ignoreCase = true)) it else "Seat $it" } ?: "—")
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            stats.forEach { (label, value) ->
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    MutantEyebrow(label, style = MutantType.Eyebrow.copy(fontSize = 9.5.sp))
+                    Text(value, style = MutantType.MonoBody.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                        color = MutantColors.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        Text(
+            "Last time: " + if (previous.isEmpty()) "first time" else previous.joinToString(" · ") { "${loadLabel(it.weightKg)}×${it.reps}" },
+            style = MutantType.Caption, color = MutantColors.TextSecondary
+        )
     }
 }
 
@@ -417,63 +497,125 @@ private fun SetTable(
     workSets: List<WorkoutSet>,
     previous: List<WorkoutSet>,
     plannedSets: Int,
+    adHoc: Boolean,
+    targets: List<Pair<Float, Int>>,
     draftActive: Boolean,
     draftWeight: String,
     draftReps: String,
     draftRir: Int,
     enabled: Boolean,
-    onDelete: (Long) -> Unit
+    onRemoveSet: (Long) -> Unit,
+    onRemovePlannedSet: () -> Unit,
+    onAddSet: () -> Unit
 ) {
-    Column(Modifier.fillMaxWidth().testTag("set_table")) {
-        SetGridRow(Modifier.padding(start = 4.dp, end = 4.dp, bottom = 8.dp)) { col ->
-            val header = listOf("SET", "PREVIOUS", "KG", "REPS", "RIR", "")[col]
+    var revealed by remember { mutableStateOf<String?>(null) }
+    // Unlogged planned sets can be dropped for today, but never below one set or below what is logged.
+    val canTrim = enabled && !adHoc && plannedSets > maxOf(1, workSets.size)
+    @Composable
+    fun Removable(key: String, onRemove: (() -> Unit)?, content: @Composable () -> Unit) {
+        if (onRemove == null) {
+            content()
+            return
+        }
+        SwipeToRemoveRow(
+            revealed = revealed == key, enabled = enabled,
+            onReveal = { revealed = if (it) key else null },
+            onRemove = { revealed = null; onRemove() },
+            revealWidth = 76.dp, removeDistance = 150.dp, cornerRadius = 12.dp, compact = true,
+            removeTag = "remove_$key"
+        ) { content() }
+    }
+    Column(Modifier.fillMaxWidth().testTag("set_table"), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        SetGridRow(Modifier.padding(start = 4.dp, end = 4.dp, bottom = 6.dp)) { col ->
+            val header = listOf("SET", "LAST", "KG", "REPS", "RIR", "")[col]
             if (header.isNotEmpty()) MutantEyebrow(header, style = MutantType.Eyebrow.copy(fontSize = 9.5.sp))
         }
         warmups.forEach { set ->
-            SetLine(label = "A", labelColor = MutantColors.TextSecondary, labelBackground = MutantColors.SurfaceContainerHigh,
-                previous = "—", kg = loadLabel(set.weightKg), reps = "${set.reps}", rir = "—",
-                textColor = MutantColors.TextSecondary, background = Color.Transparent,
-                badge = null, onDelete = { onDelete(set.id) }.takeIf { enabled }, tag = "set_row_${set.id}")
+            val remove = { onRemoveSet(set.id) }.takeIf { enabled }
+            Removable("set_row_${set.id}", remove) {
+                SetLine(label = "A", labelColor = MutantColors.TextSecondary, labelBackground = MutantColors.SurfaceContainerHigh,
+                    previous = "—", kg = loadLabel(set.weightKg), reps = "${set.reps}", rir = "—",
+                    textColor = MutantColors.TextSecondary, background = MutantColors.Background,
+                    badge = null, onDelete = remove, tag = "set_row_${set.id}")
+            }
         }
-        val rows = maxOf(plannedSets, workSets.size + if (draftActive && workSets.size >= plannedSets) 1 else 0)
+        val rows = when {
+            adHoc -> workSets.size + if (draftActive) 1 else 0
+            else -> maxOf(plannedSets, workSets.size)
+        }
         for (index in 0 until rows) {
             val prev = previous.getOrNull(index)?.let { "${loadLabel(it.weightKg)}×${it.reps}" } ?: "—"
             val set = workSets.getOrNull(index)
             when {
-                set != null -> SetLine(
-                    label = "${index + 1}", labelColor = MutantColors.Success, labelBackground = MutantColors.Success.copy(alpha = 0.14f),
-                    previous = prev, kg = loadLabel(set.weightKg), reps = "${set.reps}", rir = "${set.rir}",
-                    textColor = MutantColors.TextPrimary, background = Color.Transparent,
-                    badge = when {
-                        set.isPr -> Triple("PR", MutantColors.Warning.copy(alpha = 0.16f), MutantColors.Warning)
-                        else -> techniqueBadge(set.technique)?.let { Triple(it, MutantColors.Line, MutantColors.TextSecondary) }
-                    },
-                    onDelete = { onDelete(set.id) }.takeIf { enabled }, tag = "set_row_${set.id}"
-                )
-                index == workSets.size && draftActive -> SetLine(
-                    label = "${index + 1}", labelColor = MutantColors.OnPrimary, labelBackground = MutantColors.Primary,
-                    previous = prev, kg = draftWeight.ifBlank { "—" }, reps = draftReps.ifBlank { "—" },
-                    rir = if (draftRir >= 4) "4+" else "$draftRir",
-                    textColor = MutantColors.TextPrimary, background = MutantColors.PrimarySelected,
-                    badge = null, onDelete = null, tag = "set_row_current"
-                )
-                else -> SetLine(
-                    label = "${index + 1}", labelColor = MutantColors.TextMetadata, labelBackground = MutantColors.SurfaceContainerHigh,
-                    previous = prev, kg = "—", reps = "—", rir = "—",
-                    textColor = MutantColors.TextMetadata, background = Color.Transparent,
-                    badge = null, onDelete = null, tag = "set_row_pending_$index"
-                )
+                set != null -> {
+                    val remove = { onRemoveSet(set.id) }.takeIf { enabled }
+                    Removable("set_row_${set.id}", remove) {
+                        SetLine(
+                            label = "${index + 1}", labelColor = MutantColors.Success, labelBackground = MutantColors.Success.copy(alpha = 0.14f),
+                            previous = prev, kg = loadLabel(set.weightKg), reps = "${set.reps}", rir = "${set.rir}",
+                            textColor = MutantColors.TextPrimary, background = MutantColors.Background,
+                            badge = when {
+                                set.isPr -> Triple("PR", MutantColors.Warning.copy(alpha = 0.16f), MutantColors.Warning)
+                                else -> techniqueBadge(set.technique)?.let { Triple(it, MutantColors.Line, MutantColors.TextSecondary) }
+                            },
+                            onDelete = remove, tag = "set_row_${set.id}"
+                        )
+                    }
+                }
+                index == workSets.size && draftActive -> Removable("set_row_current", onRemovePlannedSet.takeIf { canTrim }) {
+                    SetLine(
+                        label = "${index + 1}", labelColor = MutantColors.OnPrimary, labelBackground = MutantColors.Primary,
+                        previous = prev, kg = draftWeight.toFloatOrNull()?.let(::loadLabel) ?: draftWeight.ifBlank { "—" }, reps = draftReps.ifBlank { "—" },
+                        rir = if (draftRir >= 4) "4+" else "$draftRir",
+                        textColor = MutantColors.TextPrimary, background = MutantColors.PrimaryRow,
+                        badge = null, onDelete = null, tag = "set_row_current"
+                    )
+                }
+                else -> Removable("set_row_pending_$index", onRemovePlannedSet.takeIf { canTrim }) {
+                    SetLine(
+                        label = "${index + 1}", labelColor = MutantColors.TextMetadata, labelBackground = MutantColors.SurfaceContainerHigh,
+                        previous = prev,
+                        // Upcoming sets show their target, dimmed, so the plan is readable at a glance.
+                        kg = targets.getOrNull(index)?.let { loadLabel(it.first) } ?: "—",
+                        reps = targets.getOrNull(index)?.second?.toString() ?: "—",
+                        rir = "—",
+                        textColor = MutantColors.TextMetadata, background = MutantColors.Background,
+                        badge = null, onDelete = null, tag = "set_row_pending_$index"
+                    )
+                }
             }
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (adHoc) {
+                Text("Log as many sets as you need", style = MutantType.Caption.copy(fontSize = 11.sp), color = MutantColors.TextMetadata,
+                    modifier = Modifier.weight(1f))
+            } else {
+                TextButton(onClick = onAddSet, enabled = enabled, contentPadding = PaddingValues(start = 0.dp, end = 10.dp),
+                    modifier = Modifier.height(40.dp).testTag("add_set")) {
+                    Icon(Icons.Rounded.Add, contentDescription = null, tint = MutantColors.Primary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Add set", style = MutantType.ButtonSmall.copy(fontWeight = FontWeight.SemiBold), color = MutantColors.Primary)
+                }
+                Spacer(Modifier.weight(1f))
+            }
+            Text("Swipe a set left to remove", style = MutantType.Caption.copy(fontSize = 11.sp), color = MutantColors.TextMetadata,
+                textAlign = TextAlign.End)
         }
     }
 }
 
 @Composable
 private fun SetGridRow(modifier: Modifier = Modifier, cell: @Composable (Int) -> Unit) {
+    // Fixed columns grow with the system font size so large text never clips.
+    val scale = androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceIn(1f, 1.5f)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         SetColumns.forEachIndexed { col, width ->
             Box(
-                if (width == 0.dp) Modifier.weight(1f) else Modifier.width(width),
+                if (width == 0.dp) Modifier.weight(1f) else Modifier.width(width * scale),
                 contentAlignment = if (col in 2..4) Alignment.CenterEnd else Alignment.CenterStart
             ) { cell(col) }
         }
@@ -514,7 +656,7 @@ private fun SetLine(
             4 -> Text(rir, style = value, color = textColor, maxLines = 1)
             else -> if (onDelete != null) {
                 IconButton(onClick = onDelete, modifier = Modifier.size(28.dp).testTag("delete_$tag")) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Delete set", tint = MutantColors.TextMetadata, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Rounded.Close, contentDescription = "Remove set", tint = MutantColors.TextMetadata, modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -524,6 +666,7 @@ private fun SetLine(
 @Composable
 private fun SetLogger(
     exercise: Exercise,
+    plannedSets: Int,
     workSetCount: Int,
     weightValue: String,
     repsValue: String,
@@ -615,7 +758,11 @@ private fun SetLogger(
             )
         }
         MutantButton(
-            if (warmup) "Log warm-up" else "Log set ${workSetCount + 1}/${exercise.defaultWorkSets}",
+            when {
+                warmup -> "Log warm-up"
+                plannedSets == 0 -> "Log set ${workSetCount + 1}"
+                else -> "Log set ${workSetCount + 1}/$plannedSets"
+            },
             onClick = onLogSet, enabled = enabled && valid, icon = Icons.Rounded.Check,
             modifier = Modifier.fillMaxWidth().testTag("log_set_button")
         )

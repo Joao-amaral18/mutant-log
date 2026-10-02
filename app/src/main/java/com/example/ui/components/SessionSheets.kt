@@ -32,6 +32,7 @@ fun FinishSessionSheet(
     volumeKg: Float,
     initialBodyweight: Float?,
     isFinishing: Boolean,
+    lastBodyweightNote: String? = null,
     onSave: (notes: String, bodyweightKg: Float) -> Unit,
     onDiscard: () -> Unit,
     onDismiss: () -> Unit
@@ -62,6 +63,14 @@ fun FinishSessionSheet(
                 buttonWidth = 56.dp,
                 enabled = !isFinishing
             )
+            val delta = bodyweight.toFloatOrNull()?.let { now -> initialBodyweight?.takeIf { it > 0f }?.let { now - it } }
+            if (lastBodyweightNote != null) {
+                Text(
+                    lastBodyweightNote + (delta?.takeIf { kotlin.math.abs(it) >= 0.05f }?.let { " · ${if (it > 0) "+" else ""}${oneDecimal(it)} kg" } ?: ""),
+                    style = MutantType.Caption, color = MutantColors.TextSecondary,
+                    modifier = Modifier.padding(start = 4.dp).offset(y = (-8).dp).testTag("bodyweight_last")
+                )
+            }
             Box(
                 Modifier
                     .fillMaxWidth()

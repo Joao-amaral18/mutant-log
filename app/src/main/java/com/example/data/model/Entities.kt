@@ -197,7 +197,11 @@ data class WorkoutSession(
     val restRemainingSeconds: Int = 0,
     val restCompleted: Boolean = false,
     val restRecommended: String = "2-3 min",
-    val readinessStatus: String = "Normal" // "Normal", "High fatigue detected"
+    val readinessStatus: String = "Normal", // "Normal", "High fatigue detected"
+    // Length of the current rest period, so progress survives +30 / -15 adjustments.
+    val restTotalSeconds: Int = 0,
+    // 0–100 from the pre-workout check-in; null for sessions logged before it existed.
+    val readinessScore: Int? = null
 )
 
 @Entity(
@@ -230,7 +234,13 @@ data class WorkoutExercise(
     val seatPosition: String = "",
     val handlePosition: String = "",
     val executionQuality: String = "Good", // Excellent, Good, Compromised, Bad
-    val targetMuscleQuality: String = "Good" // Excellent, Good, Weak, None
+    val targetMuscleQuality: String = "Good", // Excellent, Good, Weak, None
+    // Session plan copied from the program day; null falls back to the exercise defaults.
+    val targetWorkSets: Int? = null,
+    val targetRepMin: Int? = null,
+    val targetRepMax: Int? = null,
+    val targetRir: Int? = null,
+    val restSeconds: Int? = null
 )
 
 enum class SetType {

@@ -24,7 +24,7 @@ import com.example.data.model.*
         SetSegment::class,
         CardioSession::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -61,6 +61,35 @@ abstract class MutantDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE workout_exercises ADD COLUMN targetWorkSets INTEGER")
+                db.execSQL("ALTER TABLE workout_exercises ADD COLUMN targetRepMin INTEGER")
+                db.execSQL("ALTER TABLE workout_exercises ADD COLUMN targetRepMax INTEGER")
+                db.execSQL("ALTER TABLE workout_exercises ADD COLUMN targetRir INTEGER")
+                db.execSQL("ALTER TABLE workout_exercises ADD COLUMN restSeconds INTEGER")
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN restTotalSeconds INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN readinessScore INTEGER")
+                // Active sessions keep following their program day.
+                db.execSQL(
+                    """
+                    UPDATE workout_exercises SET
+                        targetWorkSets = (SELECT pe.targetWorkSets FROM program_exercises pe JOIN workout_sessions s ON s.programDayId = pe.programDayId
+                            WHERE s.id = workout_exercises.workoutSessionId AND pe.exerciseId = workout_exercises.exerciseId LIMIT 1),
+                        targetRepMin = (SELECT pe.repMin FROM program_exercises pe JOIN workout_sessions s ON s.programDayId = pe.programDayId
+                            WHERE s.id = workout_exercises.workoutSessionId AND pe.exerciseId = workout_exercises.exerciseId LIMIT 1),
+                        targetRepMax = (SELECT pe.repMax FROM program_exercises pe JOIN workout_sessions s ON s.programDayId = pe.programDayId
+                            WHERE s.id = workout_exercises.workoutSessionId AND pe.exerciseId = workout_exercises.exerciseId LIMIT 1),
+                        targetRir = (SELECT pe.targetRir FROM program_exercises pe JOIN workout_sessions s ON s.programDayId = pe.programDayId
+                            WHERE s.id = workout_exercises.workoutSessionId AND pe.exerciseId = workout_exercises.exerciseId LIMIT 1),
+                        restSeconds = (SELECT pe.restSeconds FROM program_exercises pe JOIN workout_sessions s ON s.programDayId = pe.programDayId
+                            WHERE s.id = workout_exercises.workoutSessionId AND pe.exerciseId = workout_exercises.exerciseId LIMIT 1)
+                    WHERE workoutSessionId IN (SELECT id FROM workout_sessions WHERE finishedAt IS NULL)
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getDatabase(context: Context): MutantDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -68,7 +97,7 @@ abstract class MutantDatabase : RoomDatabase() {
                     MutantDatabase::class.java,
                     "mutant_os_database"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                 INSTANCE = instance
                 instance

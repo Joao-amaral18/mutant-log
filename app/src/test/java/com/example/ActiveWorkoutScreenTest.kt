@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import com.example.data.db.AD_HOC_TARGET_SETS
 import com.example.data.db.WorkoutExerciseDetail
 import com.example.data.model.*
 import com.example.ui.screens.ActiveWorkoutContent
@@ -29,13 +30,14 @@ class ActiveWorkoutScreenTest {
     private val exercise = Exercise(id = 1, name = "Neutral Lat Pulldown", manufacturer = "Nautilus Pro Dual Pulley",
         muscleGroup = "Back", executionCues = "Keep your chest tall.")
 
-    private fun fixture(longTitle: Boolean = false, firstDone: Boolean = false) = ActiveWorkoutUiState(
+    private fun fixture(longTitle: Boolean = false, firstDone: Boolean = false, adHocSecond: Boolean = false) = ActiveWorkoutUiState(
         isLoading = false,
         session = WorkoutSession(id = 1, title = if (longTitle) "A long custom hypertrophy workout title" else "Pull Hypertrophy"),
         exercises = listOf("Neutral Lat Pulldown", "T-Bar Chest Supported Row", "Barbell Curl").mapIndexed { index, name ->
             WorkoutExerciseDetail(
                 WorkoutExercise(id = index + 1L, workoutSessionId = 1, exerciseId = index + 1L,
-                    orderIndex = index, nextSetWeightKg = 60f, nextSetReps = 10),
+                    orderIndex = index, nextSetWeightKg = 60f, nextSetReps = 10,
+                    targetWorkSets = if (adHocSecond && index == 1) AD_HOC_TARGET_SETS else null),
                 exercise.copy(id = index + 1L, name = name),
                 if (firstDone && index == 0) (1..2).map { WorkoutSet(id = it.toLong(), workoutExerciseId = 1, setNumber = it, weightKg = 60f, reps = 10, rir = 1) }
                 else emptyList()
@@ -48,10 +50,14 @@ class ActiveWorkoutScreenTest {
     private var finished = 0
     private var segmentEdits = 0
     private var selectedIndex = 0
+    private val removedSets = mutableListOf<Long>()
+    private var plannedRemovals = 0
+    private var addedSets = 0
 
-    private fun render(longTitle: Boolean = false, enabled: Boolean = true, firstDone: Boolean = false) {
+    private fun render(longTitle: Boolean = false, enabled: Boolean = true, firstDone: Boolean = false,
+                       adHocSecond: Boolean = false, startIndex: Int = 0) {
         compose.setContent {
-            var state by remember { mutableStateOf(fixture(longTitle, firstDone)) }
+            var state by remember { mutableStateOf(fixture(longTitle, firstDone, adHocSecond).copy(currentExerciseIndex = startIndex)) }
             var weight by remember { mutableStateOf("60.0") }
             var reps by remember { mutableStateOf("10") }
             var type by remember { mutableStateOf(SetType.WORK) }
@@ -68,7 +74,10 @@ class ActiveWorkoutScreenTest {
                     onWeightChange = { weight = it }, onRepsChange = { reps = it },
                     onSetTypeChange = { type = it }, onRirChange = { rir = it },
                     onTechniqueChange = { technique = it }, onEditSegments = { segmentEdits++ },
-                    onLogSet = { logged.add(LoggedSet(type, weight.toFloat(), reps.toInt(), rir, technique)) }
+                    onLogSet = { logged.add(LoggedSet(type, weight.toFloat(), reps.toInt(), rir, technique)) },
+                    onRemoveSet = { removedSets += it },
+                    onRemovePlannedSet = { plannedRemovals++ },
+                    onAddSet = { addedSets++ }
                 )
             }
         }
@@ -104,16 +113,74 @@ class ActiveWorkoutScreenTest {
         assertEquals(1, finished)
     }
 
-    @Test fun `finished exercise offers the next exercise and an extra set`() {
+    @Test fun `finished exercise previews what is up next and moves on`() {
         render(firstDone = true)
         compose.onNodeWithTag("log_set_button").assertDoesNotExist()
+        compose.onNodeWithTag("up_next_card").assertExists()
+        compose.onNodeWithText("UP NEXT · NAUTILUS PRO DUAL PULLEY").assertExists()
         compose.onNodeWithTag("active_workout_content").performScrollToNode(hasTestTag("next_exercise"))
         capture("normal-done")
-        compose.onNodeWithTag("extra_set").performScrollTo().performClick()
-        compose.onNodeWithTag("log_set_button").performScrollTo().assertIsEnabled()
-        compose.onNodeWithTag("next_exercise").assertDoesNotExist()
-        compose.onNodeWithTag("exercise_progress_1").performClick()
+        compose.onNodeWithTag("add_set").performScrollTo().performClick()
+        assertEquals(1, addedSets)
+        compose.onNodeWithTag("next_exercise").performScrollTo().performClick()
         assertEquals(1, selectedIndex)
+    }
+
+    @Test fun `logged sets swipe away and planned sets trim but never below what is logged`() {
+        render(firstDone = true)
+        compose.onNodeWithTag("set_row_1").performTouchInput { swipeLeft(startX = right - 4f, endX = left, durationMillis = 300) }
+        compose.waitForIdle()
+        assertEquals(listOf(1L), removedSets)
+        compose.onNodeWithTag("delete_set_row_2").performClick()
+        assertEquals(listOf(1L, 2L), removedSets)
+        // Two planned sets, both logged: nothing left to trim.
+        compose.onNodeWithTag("set_row_pending_1").assertDoesNotExist()
+        assertEquals(0, plannedRemovals)
+    }
+
+    @Test fun `an unlogged planned set can be dropped for today`() {
+        render()
+        compose.onNodeWithTag("set_row_pending_1").performTouchInput { swipeLeft(startX = right - 4f, endX = left, durationMillis = 300) }
+        compose.waitForIdle()
+        assertEquals(1, plannedRemovals)
+        compose.onNodeWithText("LAST").assertExists()
+        compose.onNodeWithText("Swipe a set left to remove").assertExists()
+    }
+
+    @Test fun `exercise added today has no plan and logs open-ended sets`() {
+        render(adHocSecond = true, startIndex = 1)
+        compose.onNodeWithTag("ad_hoc_chip").assertExists()
+        compose.onNodeWithText("Log as you go").assertExists()
+        compose.onNodeWithTag("add_set").assertDoesNotExist()
+        compose.onNodeWithText("Log as many sets as you need").assertExists()
+        compose.onNodeWithTag("log_set_button").performScrollTo().assertTextContains("Log set 1", substring = true)
+        compose.onNodeWithTag("ad_hoc_next").assertDoesNotExist()
+        capture("normal-adhoc")
+    }
+
+    @Test fun `exercise added today offers Done once a set is logged`() {
+        compose.setContent {
+            val base = fixture(adHocSecond = true)
+            val withSet = base.exercises.mapIndexed { i, d ->
+                if (i == 1) d.copy(sets = listOf(WorkoutSet(id = 9, workoutExerciseId = 2, setNumber = 1, weightKg = 40f, reps = 12))) else d
+            }
+            MyApplicationTheme {
+                ActiveWorkoutContent(
+                    state = base.copy(exercises = withSet, currentExerciseIndex = 1), weightValue = "40", repsValue = "12",
+                    setType = SetType.WORK, rir = 1, technique = IntensityTechnique.NONE, seatPosition = "", handlePosition = "",
+                    segments = emptyList(), enabled = true, onBack = {}, onFinish = { finished++ },
+                    onSelectExercise = { selectedIndex = it }, onSetup = {}, onTarget = {}, onWeightChange = {}, onRepsChange = {},
+                    onSetTypeChange = {}, onRirChange = {}, onTechniqueChange = {}, onEditSegments = {}, onLogSet = {}
+                )
+            }
+        }
+        compose.onNodeWithTag("log_set_button").performScrollTo().assertTextContains("Log set 2", substring = true)
+        // Lazy items below the fold are not composed until scrolled to.
+        compose.onNodeWithTag("active_workout_content").performScrollToNode(hasTestTag("ad_hoc_next"))
+        compose.onNodeWithTag("ad_hoc_next").assertTextContains("Done · Next: Barbell Curl", substring = true).performClick()
+        assertEquals(2, selectedIndex)
+        // Never marked done: the pill keeps its number.
+        compose.onNodeWithTag("exercise_progress_1").assertTextContains("2", substring = true)
     }
 
     @Test

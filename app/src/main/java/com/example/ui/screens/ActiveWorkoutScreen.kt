@@ -1,5 +1,10 @@
 package com.example.ui.screens
 
+import com.example.data.db.sessionSets
+import com.example.data.db.repMin
+import com.example.data.db.repMax
+import com.example.data.db.plannedRir
+import com.example.data.db.plannedRestSeconds
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
@@ -131,14 +136,14 @@ fun ActiveWorkoutScreen(
     var selectedSetType by remember(workoutExercise.id) { mutableStateOf(SetType.WORK) }
     var weightInput by remember(workoutExercise.id, progression?.suggestedWeightKg) {
         val initialWeight = workoutExercise.nextSetWeightKg
-            ?: targetFor(progression, state.previousWorkSets, exercise)?.first
+            ?: targetFor(progression, state.previousWorkSets, currentExDetail)?.first
             ?: progression?.suggestedWeightKg ?: 60f
         mutableStateOf(loadLabel(initialWeight))
     }
     var repsInput by remember(workoutExercise.id, progression?.suggestedRepsMin) {
         val initialReps = workoutExercise.nextSetReps
-            ?: targetFor(progression, state.previousWorkSets, exercise)?.second
-            ?: progression?.suggestedRepsMin ?: exercise.defaultRepMin
+            ?: targetFor(progression, state.previousWorkSets, currentExDetail)?.second
+            ?: progression?.suggestedRepsMin ?: currentExDetail.repMin
         mutableStateOf(initialReps.toString())
     }
     LaunchedEffect(workoutExercise.id, weightInput, repsInput) {
@@ -150,7 +155,7 @@ fun ActiveWorkoutScreen(
             viewModel.updateNextSet(workoutExercise.id, weight, reps)
         }
     }
-    var selectedRir by remember(workoutExercise.id) { mutableIntStateOf(exercise.defaultRir) }
+    var selectedRir by remember(workoutExercise.id) { mutableIntStateOf(currentExDetail.plannedRir) }
     var selectedTechnique by remember(workoutExercise.id) { mutableStateOf(IntensityTechnique.NONE) }
     var attachedSegments by remember(workoutExercise.id) { mutableStateOf<List<SetSegment>>(emptyList()) }
     var isLogButtonPressed by remember { mutableStateOf(false) }
@@ -192,11 +197,11 @@ fun ActiveWorkoutScreen(
     }
 
     if (sheet == SessionSheet.PROGRESSION) {
-        val target = targetFor(progression, state.previousWorkSets, exercise)
+        val target = targetFor(progression, state.previousWorkSets, currentExDetail)
         ProgressionSheet(
             targetText = target?.let { "${loadLabel(it.first)} kg × ${it.second}" } ?: "Set a baseline",
-            repRange = "${exercise.defaultRepMin}–${exercise.defaultRepMax}",
-            targetRir = exercise.defaultRir,
+            repRange = "${currentExDetail.repMin}–${currentExDetail.repMax}",
+            targetRir = currentExDetail.plannedRir,
             lastTimeText = state.previousWorkSets.takeIf { it.isNotEmpty() }
                 ?.joinToString(" · ") { "${loadLabel(it.weightKg)}×${it.reps}" } ?: "No history",
             reason = progression?.reason,
@@ -212,12 +217,17 @@ fun ActiveWorkoutScreen(
             title = session.title,
             elapsedMinutes = state.elapsedSeconds / 60,
             doneSets = loggedSets,
-            totalSets = state.exercises.sumOf { it.exercise.defaultWorkSets },
+            totalSets = state.exercises.sumOf { it.sessionSets },
             volumeKg = volume,
             initialBodyweight = lastFinished?.bodyweight,
+            lastBodyweightNote = lastFinished?.takeIf { it.bodyweight > 0f }?.let { last ->
+                val days = com.example.data.model.WorkoutRecommendationEngine.localDaysBetween(
+                    last.finishedAt ?: last.startedAt, System.currentTimeMillis(), java.util.TimeZone.getDefault())
+                "Last logged ${loadLabel(last.bodyweight)} kg · ${relativeDays(days)}"
+            },
             isFinishing = isFinishing,
             onSave = { notes, bodyweight ->
-                viewModel.finishWorkout(notes, bodyweight) {
+                viewModel.finishWorkout(notes, bodyweight, onError = { toast.show(it) }) {
                     sheet = null
                     toast.show("Workout saved · targets updated")
                     onNavigateToHistory()
@@ -241,7 +251,7 @@ fun ActiveWorkoutScreen(
                 remainingSeconds = state.restTimerRemainingSeconds,
                 isRunning = state.isRestTimerRunning,
                 isComplete = state.restTimerCompleted,
-                plannedSeconds = exercise.defaultRestSeconds,
+                plannedSeconds = state.restTimerTotalSeconds.takeIf { it > 0 } ?: currentExDetail.plannedRestSeconds,
                 executionQuality = workoutExercise.executionQuality,
                 targetMuscleQuality = workoutExercise.targetMuscleQuality,
                 onExecutionQuality = { saveQuality(it, workoutExercise.targetMuscleQuality) },
@@ -263,7 +273,7 @@ fun ActiveWorkoutScreen(
         } else {
             val name = detail.exercise.baseName.ifBlank { detail.exercise.name }
             viewModel.removeExerciseFromSession(detail.workoutExercise.id,
-                onRemoved = { toast.show("$name removed", "Undo", viewModel::undoRemoveExercise) },
+                onRemoved = { toast.show("$name removed", "Undo") { viewModel.undoRemoveExercise { toast.show(it) } } },
                 onError = { toast.show(it) })
         }
     }
@@ -275,9 +285,9 @@ fun ActiveWorkoutScreen(
             currentLabel = exercise.baseName.ifBlank { exercise.name },
             onAdd = { picked, afterCurrent ->
                 sheet = null
-                viewModel.addExerciseToSession(picked.id, afterCurrent) {
-                    toast.show("${picked.baseName.ifBlank { picked.name }} added")
-                }
+                viewModel.addExerciseToSession(picked.id, afterCurrent,
+                    onAdded = { toast.show("${picked.baseName.ifBlank { picked.name }} added") },
+                    onError = { toast.show(it) })
             },
             onDismiss = { sheet = null }
         )
@@ -294,7 +304,7 @@ fun ActiveWorkoutScreen(
                 sheet = null
                 removeTarget = null
                 viewModel.removeExerciseFromSession(pendingRemoval.workoutExercise.id,
-                    onRemoved = { toast.show("$name removed", "Undo", viewModel::undoRemoveExercise) },
+                    onRemoved = { toast.show("$name removed", "Undo") { viewModel.undoRemoveExercise { toast.show(it) } } },
                     onError = { toast.show(it) })
             }
         )
@@ -341,7 +351,17 @@ fun ActiveWorkoutScreen(
             if (it == IntensityTechnique.REST_PAUSE || it == IntensityTechnique.DROP_SET) showIntensityDialog = true
         },
         onEditSegments = { showIntensityDialog = true },
-        onDeleteSet = viewModel::deleteSet,
+        onRemoveSet = { setId ->
+            viewModel.removeLoggedSet(setId,
+                onRemoved = { toast.show("Set removed", "Undo") { viewModel.undoSetChange { toast.show(it) } } },
+                onError = { toast.show(it) })
+        },
+        onRemovePlannedSet = {
+            viewModel.removePlannedSet(workoutExercise.id,
+                onRemoved = { toast.show("Set removed from today", "Undo") { viewModel.undoSetChange { toast.show(it) } } },
+                onError = { toast.show(it) })
+        },
+        onAddSet = { viewModel.addPlannedSet(workoutExercise.id) { toast.show(it) } },
         onOpenList = { listOpen = true },
         onLogSet = {
             val weight = weightInput.toFloatOrNull()
@@ -351,7 +371,7 @@ fun ActiveWorkoutScreen(
                     workoutExerciseId = workoutExercise.id,
                     type = selectedSetType, weightKg = weight, reps = reps, rir = selectedRir,
                     technique = selectedTechnique, segments = attachedSegments,
-                    defaultRestSeconds = if (selectedSetType == SetType.WARMUP) 60 else exercise.defaultRestSeconds,
+                    defaultRestSeconds = if (selectedSetType == SetType.WARMUP) 60 else currentExDetail.plannedRestSeconds,
                     muscleGroup = exercise.muscleGroup
                 )
                 attachedSegments = emptyList()

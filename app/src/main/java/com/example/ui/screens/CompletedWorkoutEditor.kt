@@ -1,25 +1,32 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.data.model.SetType
 import com.example.data.model.WorkoutSet
 import com.example.data.model.formatLoad
-import com.example.ui.designsystem.components.MutantPrimaryButton
+import com.example.ui.designsystem.MutantColors
+import com.example.ui.designsystem.MutantType
+import com.example.ui.designsystem.components.*
 import com.example.ui.viewmodel.MutantViewModel
 
 /** Edits a detached completed-session draft; the view model owns transactional saving. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompletedWorkoutEditor(viewModel: MutantViewModel) {
     val draft by viewModel.workoutDraft.collectAsState()
@@ -37,54 +44,64 @@ fun CompletedWorkoutEditor(viewModel: MutantViewModel) {
     }
     BackHandler { leave() }
     Scaffold(
+        containerColor = MutantColors.Background,
         topBar = {
-            TopAppBar(
-                title = { Text("Edit workout") },
-                navigationIcon = {
-                    IconButton(onClick = leave, enabled = !saving) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(start = 4.dp, end = 12.dp, top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = leave, enabled = !saving) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = MutantColors.TextSecondary)
                 }
-            )
+                Text("Edit workout", style = MutantType.Title, color = MutantColors.TextPrimary)
+            }
         },
         bottomBar = {
-            Surface {
-                Column(Modifier.navigationBarsPadding().imePadding().padding(16.dp)) {
-                    error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 8.dp)) }
-                    MutantPrimaryButton(
-                        text = "Save changes", onClick = viewModel::saveWorkoutEdit,
-                        enabled = current.session.title.isNotBlank() && invalidSets.values.none { it },
-                        isLoading = saving, testTag = "save_workout_edit"
-                    )
-                }
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MutantColors.Background)
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                error?.let { Text(it, style = MutantType.BodySmall, color = MutantColors.Error) }
+                MutantButton(
+                    if (saving) "Saving…" else "Save changes", onClick = viewModel::saveWorkoutEdit,
+                    enabled = current.session.title.isNotBlank() && invalidSets.values.none { it },
+                    loading = saving, modifier = Modifier.fillMaxWidth().testTag("save_workout_edit")
+                )
             }
         }
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                OutlinedTextField(
-                    value = current.session.title,
-                    onValueChange = { viewModel.updateWorkoutDraft(current.copy(session = current.session.copy(title = it))) },
-                    label = { Text("Workout title") }, singleLine = true, enabled = !saving,
-                    isError = current.session.title.isBlank(), modifier = Modifier.fillMaxWidth()
+                MutantTextField(
+                    "WORKOUT", current.session.title,
+                    { viewModel.updateWorkoutDraft(current.copy(session = current.session.copy(title = it))) },
+                    enabled = !saving, testTag = "edit_workout_title"
                 )
+                if (current.session.title.isBlank()) Text("Give the workout a name.", style = MutantType.Caption, color = MutantColors.Error,
+                    modifier = Modifier.padding(start = 4.dp, top = 6.dp))
             }
             item {
-                OutlinedTextField(
-                    value = current.session.notes,
-                    onValueChange = { viewModel.updateWorkoutDraft(current.copy(session = current.session.copy(notes = it))) },
-                    label = { Text("Workout notes") }, enabled = !saving,
-                    modifier = Modifier.fillMaxWidth(), minLines = 2
+                MutantTextField(
+                    "NOTES", current.session.notes,
+                    { viewModel.updateWorkoutDraft(current.copy(session = current.session.copy(notes = it))) },
+                    placeholder = "Optional", singleLine = false, minHeight = 80.dp, enabled = !saving
                 )
             }
             current.exercises.forEach { detail ->
                 item(key = "exercise-${detail.workoutExercise.id}") {
-                    Text(detail.exercise.name, style = MaterialTheme.typography.titleMedium)
-                    if (detail.sets.isEmpty()) Text("No sets recorded", style = MaterialTheme.typography.bodyMedium)
+                    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(detail.exercise.name, style = MutantType.Title, color = MutantColors.TextPrimary)
+                        if (detail.sets.isEmpty()) Text("No sets recorded", style = MutantType.BodySmall, color = MutantColors.TextSecondary)
+                    }
                 }
                 items(detail.sets, key = { "set-${it.id}" }) { set ->
                     CompletedSetEditor(set, enabled = !saving, onValidityChanged = { invalidSets[set.id] = !it }) { updated ->
@@ -98,13 +115,19 @@ fun CompletedWorkoutEditor(viewModel: MutantViewModel) {
         }
     }
     if (confirmDiscard) {
-        AlertDialog(
-            onDismissRequest = { confirmDiscard = false },
-            title = { Text("Discard changes?") },
-            text = { Text("Your recorded workout will keep its saved values.") },
-            confirmButton = { TextButton(onClick = { confirmDiscard = false; viewModel.cancelWorkoutEdit() }) { Text("Discard changes") } },
-            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep editing") } }
-        )
+        MutantBottomSheet(onDismiss = { confirmDiscard = false }, modifier = Modifier.testTag("discard_edit_sheet")) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("Discard changes?", style = MutantType.SheetTitle, color = MutantColors.TextPrimary)
+                Text("The recorded workout keeps its saved values.", style = MutantType.Body, color = MutantColors.TextSecondary)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    MutantButton("Keep editing", onClick = { confirmDiscard = false }, style = MutantButtonStyle.Outline, height = 54.dp,
+                        textStyle = MutantType.Button.copy(fontSize = 15.sp), modifier = Modifier.weight(1f))
+                    MutantButton("Discard", onClick = { confirmDiscard = false; viewModel.cancelWorkoutEdit() },
+                        style = MutantButtonStyle.Danger, height = 54.dp, textStyle = MutantType.Button.copy(fontSize = 15.sp),
+                        modifier = Modifier.weight(1f).testTag("confirm_discard_edit"))
+                }
+            }
+        }
     }
 }
 
@@ -130,23 +153,23 @@ private fun CompletedSetEditor(
             onChange(set.copy(weightKg = parsedWeight!!, reps = parsedReps!!, rir = parsedRir!!))
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Set ${set.setNumber} - ${if (set.setType == com.example.data.model.SetType.WARMUP) "Warm-up" else "Work"}",
-            style = MaterialTheme.typography.labelLarge)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(MutantColors.SurfaceContainer, RoundedCornerShape(18.dp))
+            .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(18.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        MutantEyebrow("SET ${set.setNumber} · ${if (set.setType == SetType.WARMUP) "WARM-UP" else "WORK"}")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(weight, { weight = it }, label = { Text("kg") }, enabled = enabled,
-                singleLine = true, isError = !weightValid,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f))
-            OutlinedTextField(reps, { reps = it }, label = { Text("Reps") }, enabled = enabled,
-                singleLine = true, isError = !repsValid,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-            OutlinedTextField(rir, { rir = it }, label = { Text("RIR") }, enabled = enabled,
-                singleLine = true, isError = !rirValid,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+            MutantTextField("KG", weight, { weight = it }, enabled = enabled, keyboardType = KeyboardType.Decimal, modifier = Modifier.weight(1f))
+            MutantTextField("REPS", reps, { reps = it }, enabled = enabled, keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
+            MutantTextField("RIR", rir, { rir = it }, enabled = enabled, keyboardType = KeyboardType.Number, modifier = Modifier.weight(1f))
         }
         if (!weightValid || !repsValid || !rirValid) Text(
             "Enter a weight of 0 or more, at least 1 rep, and RIR from 0 to 10.",
-            color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall
+            style = MutantType.Caption, color = MutantColors.Error
         )
     }
 }

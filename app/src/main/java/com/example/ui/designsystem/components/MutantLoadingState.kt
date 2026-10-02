@@ -59,7 +59,7 @@ fun MutantLoadingIndicator(
 @Composable
 fun MutantLoadingContent(
     modifier: Modifier = Modifier,
-    message: String? = "Carregando...",
+    message: String? = "Loading…",
     subMessage: String? = null,
     indicatorColor: Color = MutantColors.Primary,
     indicatorSize: Dp = 40.dp
@@ -101,7 +101,7 @@ fun MutantLoadingContent(
 @Composable
 fun MutantLoadingScreen(
     modifier: Modifier = Modifier,
-    message: String? = "Carregando...",
+    message: String? = "Loading…",
     subMessage: String? = null,
     testTag: String = "loading_screen"
 ) {
@@ -127,7 +127,7 @@ fun MutantLoadingScreen(
 fun MutantLoadingOverlay(
     visible: Boolean,
     modifier: Modifier = Modifier,
-    message: String = "Carregando...",
+    message: String = "Loading…",
     subMessage: String? = null,
     testTag: String = "loading_overlay"
 ) {
