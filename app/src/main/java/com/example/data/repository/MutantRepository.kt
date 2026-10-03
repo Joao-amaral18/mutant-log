@@ -80,7 +80,8 @@ class MutantRepository(private val dao: MutantDao) {
         repMin: Int = 10,
         repMax: Int = 12,
         targetRir: Int = 0,
-        incrementKg: Float = 2.5f
+        incrementKg: Float = 2.5f,
+        stack: Boolean = false
     ): ProgressionRecommendation = withContext(Dispatchers.IO) {
         val lastSets = dao.getLastSessionWorkSetsForExercise(exerciseId)
         val lastWe = dao.getLastWorkoutExercise(exerciseId)
@@ -91,7 +92,8 @@ class MutantRepository(private val dao: MutantDao) {
             targetRir = targetRir,
             incrementKg = incrementKg,
             lastExecutionQuality = lastWe?.executionQuality ?: "Good",
-            lastTargetMuscleQuality = lastWe?.targetMuscleQuality ?: "Good"
+            lastTargetMuscleQuality = lastWe?.targetMuscleQuality ?: "Good",
+            stack = stack
         )
     }
 
@@ -202,18 +204,23 @@ class MutantRepository(private val dao: MutantDao) {
     }
 
     // --- WORKOUT EXECUTION ACTIONS ---
+    /** With [retroactiveMinutes], the session is a workout done earlier: it starts at [startedAt] and lasts that long. */
     suspend fun startWorkoutSession(
         programDay: ProgramDay,
         gymId: Long,
-        readiness: ReadinessInput
+        readiness: ReadinessInput,
+        startedAt: Long = System.currentTimeMillis(),
+        retroactiveMinutes: Int? = null
     ): Long = withContext(Dispatchers.IO) {
         val calculatedStatus = calculateReadinessStatus(readiness)
         val session = WorkoutSession(
             programDayId = programDay.id,
             gymId = gymId,
             title = programDay.title,
-            startedAt = System.currentTimeMillis(),
+            startedAt = startedAt,
             finishedAt = null,
+            durationMinutes = retroactiveMinutes ?: 0,
+            isRetroactive = retroactiveMinutes != null,
             sleepScore = readiness.sleep,
             energyScore = readiness.energy,
             sorenessScore = readiness.soreness,
@@ -306,8 +313,10 @@ class MutantRepository(private val dao: MutantDao) {
 
     suspend fun finishWorkout(sessionId: Long, notes: String = "", bodyweight: Float = 0f) = withContext(Dispatchers.IO) {
         val session = dao.getWorkoutSessionById(sessionId).firstOrNull() ?: return@withContext
-        val finishTime = System.currentTimeMillis()
-        val durationMins = ((finishTime - session.startedAt) / 60000).toInt().coerceAtLeast(1)
+        // A past workout ends when the user said it did, not when they finished typing it in.
+        val durationMins = if (session.isRetroactive) session.durationMinutes.coerceAtLeast(1)
+            else ((System.currentTimeMillis() - session.startedAt) / 60000).toInt().coerceAtLeast(1)
+        val finishTime = if (session.isRetroactive) session.startedAt + durationMins * 60_000L else System.currentTimeMillis()
         val updated = session.copy(
             finishedAt = finishTime,
             durationMinutes = durationMins,
@@ -315,6 +324,7 @@ class MutantRepository(private val dao: MutantDao) {
             bodyweight = if (bodyweight > 0) bodyweight else session.bodyweight
         )
         dao.completeWorkoutSession(updated.copy(restDeadline = null, restRemainingSeconds = 0))
+        if (session.isRetroactive) dao.spreadSetTimes(session.id, session.startedAt, finishTime)
         dao.rebuildPersonalRecords()
     }
 

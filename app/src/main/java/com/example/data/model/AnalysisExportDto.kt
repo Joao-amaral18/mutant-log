@@ -159,7 +159,10 @@ data class WorkoutExport(
 
     val bodyweightKg: Double?,
 
-    val exercises: List<WorkoutExerciseExport>
+    val exercises: List<WorkoutExerciseExport>,
+
+    // Logged after the fact: start and duration were entered by hand and set times are spread over them.
+    val retroactive: Boolean = false
 )
 
 @Serializable
@@ -209,6 +212,9 @@ data class WorkoutSetExport(
     val restAfterSeconds: Int?,
 
     val technique: String?,
+
+    // "kg", or "stack_pin" when weightKg is a pin position on a selectorized stack rather than kilograms.
+    val loadUnit: String = "kg",
 
     val segments: List<SetSegmentExport> = emptyList(),
 

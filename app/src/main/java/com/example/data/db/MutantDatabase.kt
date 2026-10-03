@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 import com.example.data.model.*
 
 /** Bump together with a migration; also written into exports so Import knows the source schema. */
-const val MUTANT_DB_VERSION = 6
+const val MUTANT_DB_VERSION = 7
 
 @Database(
     entities = [
@@ -93,6 +93,14 @@ abstract class MutantDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE exercises ADD COLUMN loadUnit TEXT NOT NULL DEFAULT 'KG'")
+                db.execSQL("ALTER TABLE programs ADD COLUMN scheduleMode TEXT NOT NULL DEFAULT 'WEEKDAYS'")
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN isRetroactive INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getDatabase(context: Context): MutantDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -100,7 +108,7 @@ abstract class MutantDatabase : RoomDatabase() {
                     MutantDatabase::class.java,
                     "mutant_os_database"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                 INSTANCE = instance
                 instance

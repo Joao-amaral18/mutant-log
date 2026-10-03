@@ -12,7 +12,8 @@ data class HistorySet(val set: WorkoutSet, val segments: List<SetSegment> = empt
 // Derived values are computed once per object: History reads them for every row on every recomposition.
 data class HistoryExercise(val workoutExercise: WorkoutExercise, val exercise: Exercise, val sets: List<HistorySet>) {
     val workSets by once { sets.filter { it.set.setType == SetType.WORK } }
-    val volume by once { workSets.sumOf { it.volume } }
+    // Stack-pin loads are positions, not kilograms: they would distort kg volume, so they count as zero.
+    val volume by once { if (exercise.usesStack) 0.0 else workSets.sumOf { it.volume } }
     val reps by once { workSets.sumOf { it.reps } }
     val bestSet by once { workSets.maxWithOrNull(compareBy<HistorySet> { it.set.weightKg }.thenBy { it.set.reps })?.set }
     val e1rm by once { workSets.maxOfOrNull { it.set.weightKg.toDouble() * (1 + it.set.reps / 30.0) } ?: 0.0 }

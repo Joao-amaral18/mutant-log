@@ -129,6 +129,7 @@ class AnalysisExportRepositoryImpl(
                 startedAt = isoFormat.format(Date(session.startedAt)),
                 finishedAt = session.finishedAt?.let { isoFormat.format(Date(it)) },
                 bodyweightKg = if (session.bodyweight > 0f) session.bodyweight.toDouble() else null,
+                retroactive = session.isRetroactive,
                 exercises = wExercises.map { we ->
                     val ex = exerciseMap[we.exerciseId]
                     val wSets = setsByWorkoutExerciseId[we.id] ?: emptyList()
@@ -170,6 +171,7 @@ class AnalysisExportRepositoryImpl(
                                 performedAt = isoFormat.format(Date(s.completedAt)),
                                 restAfterSeconds = ex?.defaultRestSeconds,
                                 technique = s.technique.name.lowercase(),
+                                loadUnit = if (ex?.usesStack == true) "stack_pin" else "kg",
                                 segments = segs.map { seg ->
                                     SetSegmentExport(
                                         sequence = seg.segmentIndex,

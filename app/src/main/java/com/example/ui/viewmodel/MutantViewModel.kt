@@ -368,8 +368,8 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         val nextDetail = state.exercises.getOrNull(state.currentExerciseIndex + 1)
         // Logging a set re-emits the exercise list, but the targets only depend on these inputs.
         val key = listOf(state.session?.id, state.currentExerciseIndex, currentEx.id, currentExDetail.repMin,
-            currentExDetail.repMax, currentExDetail.plannedRir, nextDetail?.exercise?.id, nextDetail?.repMin,
-            nextDetail?.repMax, nextDetail?.plannedRir)
+            currentExDetail.repMax, currentExDetail.plannedRir, currentEx.loadUnit, nextDetail?.exercise?.id, nextDetail?.repMin,
+            nextDetail?.repMax, nextDetail?.plannedRir, nextDetail?.exercise?.loadUnit)
         if (key == progressionKey && state.currentProgression != null) return
         progressionKey = key
         progressionJob?.cancel()
@@ -380,7 +380,9 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                 repMin = currentExDetail.repMin,
                 repMax = currentExDetail.repMax,
                 targetRir = currentExDetail.plannedRir,
-                incrementKg = currentEx.defaultIncrementKg
+                // A pin-loaded stack moves one position at a time.
+                incrementKg = if (currentEx.usesStack) 1f else currentEx.defaultIncrementKg,
+                stack = currentEx.usesStack
             )
             val previous = repository.getPreviousWorkSets(currentEx.id)
             val nextRecommendation = nextDetail?.let { next ->
@@ -389,7 +391,8 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                     repMin = next.repMin,
                     repMax = next.repMax,
                     targetRir = next.plannedRir,
-                    incrementKg = next.exercise.defaultIncrementKg
+                    incrementKg = if (next.exercise.usesStack) 1f else next.exercise.defaultIncrementKg,
+                    stack = next.exercise.usesStack
                 )
             }
             val nextPrevious = nextDetail?.let { repository.getPreviousWorkSets(it.exercise.id) } ?: emptyList()
@@ -489,6 +492,21 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         createWorkout(onStarted) { gymId -> repository.startWorkoutSession(programDay, gymId, readiness) }
     }
 
+    /** Opens a workout done earlier so it can be logged with the normal session screen; no rest timer runs. */
+    fun startPastWorkout(programDay: ProgramDay, startedAt: Long, durationMinutes: Int, onStarted: () -> Unit = {}) {
+        createWorkout(onStarted) { gymId ->
+            repository.startWorkoutSession(programDay, gymId, ReadinessInput(), startedAt, durationMinutes.coerceIn(1, 600))
+        }
+    }
+
+    fun setExerciseLoadUnit(exerciseId: Long, unit: String) {
+        launchWorkoutMutation { dao.setExerciseLoadUnit(exerciseId, unit) }
+    }
+
+    fun setScheduleMode(programId: Long, mode: String) {
+        viewModelScope.launch { dao.setProgramScheduleMode(programId, mode) }
+    }
+
     fun startAdHocWorkout(title: String, exerciseIds: List<Long>, readiness: ReadinessInput, onStarted: () -> Unit = {}) {
         createWorkout(onStarted) { gymId -> repository.startAdHocWorkoutSession(title, gymId, exerciseIds, readiness) }
     }
@@ -563,6 +581,8 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                 "Recommended: 2–3 min"
             }
             // Set, segments and the auto-started rest timer land in one commit (one fsync on eMMC).
+            // A workout logged after the fact has no rest to time.
+            val retro = _activeWorkoutUiState.value.session?.isRetroactive == true
             repository.logSet(
                 workoutExerciseId = workoutExerciseId,
                 setType = type,
@@ -571,7 +591,7 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                 rir = rir,
                 technique = technique,
                 segments = segments,
-                restSeconds = defaultRestSeconds,
+                restSeconds = if (retro) null else defaultRestSeconds,
                 restRecommended = recommendedText
             )
         }
@@ -780,7 +800,8 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
             lastWorkout = lastWorkout,
             persistedPosition = activeProgram?.currentRoutinePosition ?: -1,
             nowMillis = nowMillis,
-            timeZone = TimeZone.getDefault()
+            timeZone = TimeZone.getDefault(),
+            rotation = activeProgram?.isRotation == true
         )
         val daysAgo = recommendation.daysSinceLastWorkout
         val recoveryText = when (daysAgo) {

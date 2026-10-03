@@ -59,6 +59,9 @@ import java.math.BigDecimal
 
 fun loadLabel(value: Float): String = BigDecimal(value.toString()).stripTrailingZeros().toPlainString()
 
+/** "8 kg", or "pin 8" for a pin-loaded stack. */
+fun loadText(value: Float, stack: Boolean): String = if (stack) "pin ${loadLabel(value)}" else "${loadLabel(value)} kg"
+
 fun restLabel(seconds: Int): String = "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
 
 /** Plates per side on a 20 kg bar, heaviest first. */
@@ -137,6 +140,9 @@ fun ActiveWorkoutContent(
     onOpenList: () -> Unit = {},
     // Read lazily in the header label so the per-second tick does not recompose the session screen.
     elapsedSeconds: () -> Long = { 0L },
+    // Shown instead of the running clock for a workout logged after the fact.
+    pastWorkoutLabel: String? = null,
+    onLoadUnitChange: (String) -> Unit = {},
     setupEditor: @Composable () -> Unit = {},
     restTimer: @Composable () -> Unit = {}
 ) {
@@ -176,7 +182,10 @@ fun ActiveWorkoutContent(
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(session.title, style = MutantType.Title.copy(lineHeight = 20.sp), color = MutantColors.TextPrimary,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        TickingText({ "${formatClock(elapsedSeconds())} · $doneSets/$totalSets sets" },
+                        if (pastWorkoutLabel != null) Text("$pastWorkoutLabel · $doneSets/$totalSets sets",
+                            style = MutantType.MonoLabel, color = MutantColors.Warning, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("past_workout_label"))
+                        else TickingText({ "${formatClock(elapsedSeconds())} · $doneSets/$totalSets sets" },
                             style = MutantType.MonoLabel, color = MutantColors.TextSecondary)
                     }
                     Surface(
@@ -273,7 +282,7 @@ fun ActiveWorkoutContent(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             MutantEyebrow("TODAY’S TARGET", color = MutantColors.Primary)
                             Text(
-                                target?.let { "${loadLabel(it.first)} kg × ${it.second}" } ?: if (adHoc) "Log as you go" else "Set a baseline",
+                                target?.let { "${loadText(it.first, exercise.usesStack)} × ${it.second}" } ?: if (adHoc) "Log as you go" else "Set a baseline",
                                 style = MutantType.MonoValue, color = MutantColors.TextPrimary
                             )
                             Text(
@@ -294,13 +303,14 @@ fun ActiveWorkoutContent(
                     cue = exercise.executionCues,
                     open = setupOpen, enabled = enabled,
                     onToggle = { setupOpen = !setupOpen }, onEdit = onSetup,
+                    stack = exercise.usesStack, onLoadUnitChange = onLoadUnitChange,
                     editor = setupEditor
                 )
             }
             item(key = "sets") {
                 SetTable(
                     warmups = warmups, workSets = workSets, previous = state.previousWorkSets,
-                    plannedSets = detail.plannedSets, adHoc = adHoc,
+                    plannedSets = detail.plannedSets, adHoc = adHoc, stack = exercise.usesStack,
                     targets = perSetTargets(state.currentProgression, state.previousWorkSets, detail),
                     draftActive = showLogger && setType == SetType.WORK,
                     draftWeight = weightValue, draftReps = repsValue, draftRir = rir,
@@ -444,6 +454,7 @@ private fun SetupCard(
     seat: String, handle: String, note: String, cue: String,
     open: Boolean, enabled: Boolean,
     onToggle: () -> Unit, onEdit: () -> Unit,
+    stack: Boolean, onLoadUnitChange: (String) -> Unit,
     editor: @Composable () -> Unit
 ) {
     val summary = listOfNotNull(
@@ -475,6 +486,14 @@ private fun SetupCard(
                     modifier = Modifier.height(32.dp).testTag("edit_seat_setup")) {
                     Text("Edit setup", style = MutantType.ButtonSmall, color = MutantColors.Primary)
                 }
+                // Pin-loaded stacks are logged by position; their numbers are not kilograms.
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Load in", style = MutantType.BodySmall, color = MutantColors.TextSecondary)
+                    MutantChoiceChip("kg", !stack, { onLoadUnitChange(LOAD_UNIT_KG) }, enabled = enabled,
+                        modifier = Modifier.testTag("load_unit_kg"))
+                    MutantChoiceChip("Stack pin", stack, { onLoadUnitChange(LOAD_UNIT_STACK) }, enabled = enabled,
+                        modifier = Modifier.testTag("load_unit_stack"))
+                }
                 editor()
             }
         }
@@ -500,6 +519,7 @@ private fun SetTable(
     previous: List<WorkoutSet>,
     plannedSets: Int,
     adHoc: Boolean,
+    stack: Boolean,
     targets: List<Pair<Float, Int>>,
     draftActive: Boolean,
     draftWeight: String,
@@ -529,7 +549,7 @@ private fun SetTable(
     }
     Column(Modifier.fillMaxWidth().testTag("set_table"), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         SetGridRow(Modifier.padding(start = 4.dp, end = 4.dp, bottom = 6.dp)) { col ->
-            val header = listOf("SET", "LAST", "KG", "REPS", "RIR", "")[col]
+            val header = listOf("SET", "LAST", if (stack) "PIN" else "KG", "REPS", "RIR", "")[col]
             if (header.isNotEmpty()) MutantEyebrow(header, style = MutantType.Eyebrow.copy(fontSize = 9.5.sp))
         }
         warmups.forEach { set ->
@@ -688,7 +708,8 @@ private fun SetLogger(
     val weight = weightValue.toFloatOrNull()
     val reps = repsValue.toIntOrNull()
     val valid = weight != null && weight.isFinite() && weight >= 0f && reps != null && reps > 0
-    val step = exercise.defaultIncrementKg.takeIf { it.isFinite() && it > 0f } ?: 2.5f
+    val stack = exercise.usesStack
+    val step = if (stack) 1f else exercise.defaultIncrementKg.takeIf { it.isFinite() && it > 0f } ?: 2.5f
     val warmup = setType == SetType.WARMUP
     Column(
         Modifier
@@ -721,10 +742,10 @@ private fun SetLogger(
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             MutantStepper(
-                label = "LOAD · KG", value = weightValue, onValueChange = onWeightChange,
+                label = if (stack) "LOAD · STACK PIN" else "LOAD · KG", value = weightValue, onValueChange = onWeightChange,
                 onMinus = { onWeightChange(loadLabel(((weight ?: 0f) - step).coerceAtLeast(0f))) },
                 onPlus = { onWeightChange(loadLabel((weight ?: 0f) + step)) },
-                tag = "weight", valueDescription = "Load in kilograms", enabled = enabled,
+                tag = "weight", valueDescription = if (stack) "Load as stack pin position" else "Load in kilograms", enabled = enabled,
                 modifier = Modifier.weight(1f)
             )
             MutantStepper(
@@ -772,7 +793,7 @@ private fun SetLogger(
             Text("Enter a load of 0 kg or more and at least 1 rep.", style = MutantType.Caption, color = MutantColors.Error,
                 modifier = Modifier.testTag("set_input_error"))
         } else {
-            Text(platesPerSide(weight ?: 0f), style = MutantType.MonoLabel.copy(fontWeight = FontWeight.Normal),
+            Text(if (stack) "Stack position, not kg" else platesPerSide(weight ?: 0f), style = MutantType.MonoLabel.copy(fontWeight = FontWeight.Normal),
                 color = MutantColors.TextMetadata, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         }
     }
