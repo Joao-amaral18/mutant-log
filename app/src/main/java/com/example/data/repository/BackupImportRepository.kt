@@ -152,7 +152,11 @@ class BackupImportRepository(
 
         // Programs. Merge keeps an existing program with the same name untouched and links days by index.
         val existingPrograms = if (merge) dao.getAllProgramsSync() else emptyList()
-        val hasActiveProgram = existingPrograms.any { it.isActive }
+        // A file with programs but no workouts is a program to switch to, so its active program takes over.
+        // A full backup merged into a phone with its own active program leaves that one in charge.
+        val programFile = backup.workoutSessions.isEmpty() && backup.programs.any { it.isActive }
+        val hasActiveProgram = existingPrograms.any { it.isActive } && !programFile
+        if (merge && programFile) dao.deactivateAllPrograms()
         val programIds = HashMap<Long, Long>()
         val dayIds = HashMap<Long, Long>()
         val insertedPrograms = mutableListOf<Pair<Program, Long>>()

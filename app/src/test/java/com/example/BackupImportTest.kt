@@ -283,4 +283,55 @@ class BackupImportTest {
         assertEquals(6, result.addedSets)
         assertEquals(2, result.invalidRows)
     }
+
+    @Test fun `a program-only file becomes the active program on merge`() = runBlocking {
+        val target = newDb()
+        val dao = target.mutantDao()
+        dao.insertProgram(Program(name = "Old Split", isActive = true))
+        val bundled = dao.getAllExercisesSync().first()
+        val file = AnalysisExport(
+            generatedAt = "2026-10-03T00:00:00Z", app = AppExport(), profile = null, program = null,
+            gyms = emptyList(), exerciseVariants = emptyList(), workouts = emptyList(), bodyweight = emptyList(),
+            cardio = emptyList(), readiness = emptyList(),
+            backup = BackupExport(
+                databaseVersion = 6,
+                exercises = listOf(bundled.copy(id = 900), Exercise(id = 901, name = "Drop Squat Machine", muscleGroup = "Quads", source = "user")),
+                programs = listOf(Program(id = 1, name = "New Protocol", isActive = true)),
+                programDays = listOf(ProgramDay(id = 10, programId = 1, dayIndex = 0, dayCode = "MON", title = "Legs")),
+                programExercises = listOf(
+                    ProgramExercise(id = 1, programDayId = 10, exerciseId = 900, orderIndex = 0),
+                    ProgramExercise(id = 2, programDayId = 10, exerciseId = 901, orderIndex = 1, targetWorkSets = 2, repMin = 12, repMax = 15)
+                )
+            )
+        )
+        val text = json.encodeToString(AnalysisExport.serializer(), file)
+        val result = BackupImportRepository(target).apply(preview(target, text), ImportMode.MERGE)
+        assertEquals(1, result.addedPrograms)
+        assertEquals(1, result.addedExercises)
+        assertEquals("New Protocol", dao.getAllProgramsSync().single { it.isActive }.name)
+        val day = dao.getAllProgramDaysSync().single { it.title == "Legs" }
+        val targets = dao.getAllProgramExercisesSync().filter { it.programDayId == day.id }.sortedBy { it.orderIndex }
+        assertEquals(bundled.id, targets[0].exerciseId)
+        assertEquals(listOf(12, 15), listOf(targets[1].repMin, targets[1].repMax))
+    }
+
+    @Test fun `the Nick Walker protocol file imports and replaces the active program`() = runBlocking {
+        val target = newDb()
+        val dao = target.mutantDao()
+        MutantRepository(dao).adoptNickWalkerTemplate()
+        val text = requireNotNull(javaClass.classLoader!!.getResource("nick-walker-protocol.json")).readText()
+        val preview = preview(target, text)
+        assertFalse(preview.legacy)
+        val result = BackupImportRepository(target).apply(preview, ImportMode.MERGE)
+        assertEquals(0, result.invalidRows)
+        assertEquals("only the exercises missing from the catalog are added", 9, result.addedExercises)
+        val active = dao.getAllProgramsSync().single { it.isActive }
+        assertEquals("Nick Walker Protocol", active.name)
+        val days = dao.getProgramDaysForProgramSync(active.id)
+        assertEquals(listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"), days.map { it.dayCode })
+        assertEquals(3, days.count { it.isRestDay })
+        val targets = dao.getAllProgramExercisesSync().filter { pe -> days.any { it.id == pe.programDayId } }
+        assertEquals(28, targets.size)
+        assertEquals(11, targets.count { it.programDayId == days.single { d -> d.dayCode == "THU" }.id })
+    }
 }
