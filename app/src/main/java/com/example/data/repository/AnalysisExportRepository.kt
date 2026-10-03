@@ -56,7 +56,11 @@ class AnalysisExportRepositoryImpl(
             )
         }
 
-        val programDaysExport = programDays.map { day ->
+        // The analysis view describes the active program only; every program is still in the backup section.
+        val programs = dao.getAllProgramsSync()
+        val activeProgram = programs.filter { it.isActive }.maxByOrNull { it.id }
+        val activeDays = programDays.filter { it.programId == activeProgram?.id }
+        val programDaysExport = activeDays.map { day ->
             val dayExercises = programExercisesByDayId[day.id] ?: emptyList()
             ProgramDayExport(
                 id = "day-${day.id}",
@@ -84,9 +88,9 @@ class AnalysisExportRepositoryImpl(
         }
 
         val programExport = ProgramExport(
-            id = "program-nick-walker-reconstruction",
-            name = "Nick Walker Reconstruction",
-            startedAt = workouts.firstOrNull()?.startedAt?.let { isoFormat.format(Date(it)) },
+            id = "program-${activeProgram?.id ?: 0}",
+            name = activeProgram?.name ?: "No active program",
+            startedAt = activeProgram?.createdAt?.let { isoFormat.format(Date(it)) },
             days = programDaysExport
         )
 
@@ -241,7 +245,7 @@ class AnalysisExportRepositoryImpl(
             gymEquipment = dao.getAllGymEquipmentSync(),
             machineCatalog = dao.getUserMachinesSync(),
             exerciseVariants = dao.getUserExerciseVariantsSync(),
-            programs = dao.getAllProgramsSync(),
+            programs = programs,
             programDays = programDays,
             programExercises = programExercises,
             workoutSessions = finished,
