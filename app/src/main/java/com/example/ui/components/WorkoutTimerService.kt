@@ -16,6 +16,7 @@ import com.example.data.db.MutantDatabase
 import com.example.data.model.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /** Persisted deadlines drive the system chronometer; ticks refresh notification progress. */
 class WorkoutTimerService : Service() {
@@ -40,7 +41,7 @@ class WorkoutTimerService : Service() {
             }
         }
         if (observer == null) observer = scope.launch {
-            dao.getActiveWorkoutSession().collectLatest { session ->
+            dao.getActiveWorkoutSession().distinctUntilChanged().collectLatest { session ->
                 ticker?.cancel()
                 cancelCompletion()
                 if (session == null) {
@@ -52,11 +53,17 @@ class WorkoutTimerService : Service() {
                         publish(buildNotification(session, current))
                         ticker?.cancel()
                         ticker = scope.launch {
-                            while (session.restDeadline != null && session.restSecondsAt(System.currentTimeMillis()) > 0) {
-                                delay(1000)
-                                if (session.restSecondsAt(System.currentTimeMillis()) == 0) {
-                                    completeRest(session.id, session.restDeadline)
-                                } else publish(buildNotification(session, current))
+                            // The chronometer counts down by itself; only the progress bar needs a refresh, and only
+                            // while someone can see it. Re-posting two RemoteViews every second cost SystemUI work
+                            // for the whole rest, screen on or off.
+                            val power = getSystemService(PowerManager::class.java)
+                            while (true) {
+                                val deadline = session.restDeadline ?: break
+                                val left = deadline - System.currentTimeMillis()
+                                if (left <= 0) { completeRest(session.id, deadline); break }
+                                delay(minOf(left, PROGRESS_REFRESH_MS))
+                                if (System.currentTimeMillis() >= deadline) { completeRest(session.id, deadline); break }
+                                if (power?.isInteractive != false) publish(buildNotification(session, current))
                             }
                         }
                         cancelCompletion()
@@ -170,6 +177,7 @@ class WorkoutTimerService : Service() {
     private fun cancelCompletion() { completionListener?.let { getSystemService(AlarmManager::class.java).cancel(it) }; completionListener = null }
     override fun onDestroy() { cancelCompletion(); scope.cancel(); super.onDestroy() }
     companion object {
+        private const val PROGRESS_REFRESH_MS = 5_000L
         const val OPEN_FINISH_EXTRA = "open_finish_workout_confirmation"
         const val ACTION_START_OR_UPDATE = "com.example.action.TIMER_START_OR_UPDATE"
         const val ACTION_TOGGLE = "com.example.action.TIMER_TOGGLE"

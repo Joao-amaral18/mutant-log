@@ -318,6 +318,7 @@ class MutantRepository(private val dao: MutantDao) {
         dao.rebuildPersonalRecords()
     }
 
+    /** Logs one set with its segments; with [restSeconds] the rest timer starts in the same transaction. */
     suspend fun logSet(
         workoutExerciseId: Long,
         setType: SetType,
@@ -325,14 +326,13 @@ class MutantRepository(private val dao: MutantDao) {
         reps: Int,
         rir: Int,
         technique: IntensityTechnique,
-        segments: List<SetSegment> = emptyList()
+        segments: List<SetSegment> = emptyList(),
+        restSeconds: Int? = null,
+        restRecommended: String? = null
     ): Long = withContext(Dispatchers.IO) {
-        val existingSets = dao.getSetsForWorkoutExercise(workoutExerciseId).firstOrNull() ?: emptyList()
-        val nextSetNumber = existingSets.size + 1
-
         val newSet = WorkoutSet(
             workoutExerciseId = workoutExerciseId,
-            setNumber = nextSetNumber,
+            setNumber = 0, // numbered inside the transaction
             setType = setType,
             weightKg = weightKg,
             reps = reps,
@@ -340,13 +340,7 @@ class MutantRepository(private val dao: MutantDao) {
             technique = technique,
             completedAt = System.currentTimeMillis()
         )
-        val setId = dao.insertWorkoutSet(newSet)
-
-        segments.forEach { seg ->
-            dao.insertSetSegment(seg.copy(workoutSetId = setId))
-        }
-
-        setId
+        dao.logSet(newSet, segments, restSeconds, restRecommended)
     }
 
     suspend fun addExerciseToSession(sessionId: Long, exerciseId: Long, position: Int): Long = withContext(Dispatchers.IO) {

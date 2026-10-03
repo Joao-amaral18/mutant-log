@@ -56,14 +56,18 @@ internal fun HistoryMonthSelector(
 internal fun HistoryCalendar(workouts: List<HistoryWorkout>, onOpen: (Long) -> Unit) {
     var offset by rememberSaveable { mutableIntStateOf(0) }
     var selected by rememberSaveable { mutableStateOf(historyDate(System.currentTimeMillis(), "yyyy-MM-dd")) }
-    val month = historyMonth(offset)
-    val monthKey = historyDate(month.timeInMillis, "yyyy-MM")
-    val monthSessions = workouts.filter { historyDate(it.session.startedAt, "yyyy-MM") == monthKey }
-    val byDate = monthSessions.groupBy { historyDate(it.session.startedAt, "yyyy-MM-dd") }
+    val month = remember(offset) { historyMonth(offset) }
+    val monthKey = remember(month) { historyDate(month.timeInMillis, "yyyy-MM") }
+    // Tapping a day recomposes the grid; the month's grouping only changes with the data or the month.
+    val byDate = remember(workouts, monthKey) {
+        workouts.filter { historyDate(it.session.startedAt, "yyyy-MM") == monthKey }
+            .groupBy { historyDate(it.session.startedAt, "yyyy-MM-dd") }
+    }
+    val monthSessions = remember(byDate) { byDate.values.flatten() }
     val days = month.getActualMaximum(Calendar.DAY_OF_MONTH)
     val first = (month.get(Calendar.DAY_OF_WEEK) + 5) % 7
-    val today = historyDate(System.currentTimeMillis(), "yyyy-MM-dd")
-    val selectedSessions = byDate[selected].orEmpty().sortedByDescending { it.session.startedAt }
+    val today = remember { historyDate(System.currentTimeMillis(), "yyyy-MM-dd") }
+    val selectedSessions = remember(byDate, selected) { byDate[selected].orEmpty().sortedByDescending { it.session.startedAt } }
     val moveMonth: (Int) -> Unit = { delta ->
         offset += delta
         selected = historyDate(historyMonth(offset).timeInMillis, "yyyy-MM-dd")

@@ -35,7 +35,8 @@ internal fun HistoryExerciseList(summaries: List<HistoryExerciseSummary>, onOpen
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(HistoryExerciseSort.RECENT) }
     val matching = remember(summaries, query, sort) {
-        val filtered = summaries.filter { WorkoutHistory.normalize(query) in WorkoutHistory.normalize(it.exercise.name) }
+        val needle = WorkoutHistory.normalize(query)
+        val filtered = summaries.filter { needle in WorkoutHistory.normalize(it.exercise.name) }
         when (sort) {
             HistoryExerciseSort.RECENT -> filtered.sortedByDescending { it.latest.workout.session.startedAt }
             HistoryExerciseSort.NAME -> filtered.sortedBy { WorkoutHistory.normalize(it.exercise.name) }

@@ -206,6 +206,15 @@ interface MutantDao {
     suspend fun updateNextSet(id: Long, weight: Float, reps: Int)
     @Query("UPDATE workout_sessions SET restDeadline = NULL, restRemainingSeconds = 0, restCompleted = 1 WHERE id = :id AND finishedAt IS NULL AND restDeadline = :deadline AND restDeadline <= :now")
     suspend fun completeRestIfDue(id: Long, deadline: Long, now: Long): Int
+    /** One commit per logged set: the set, its segments and, when given, the rest timer that follows it. */
+    @Transaction
+    suspend fun logSet(set: WorkoutSet, segments: List<SetSegment>, restSeconds: Int?, restRecommended: String?): Long {
+        val id = insertWorkoutSet(set.copy(setNumber = getSetsForWorkoutExerciseSync(set.workoutExerciseId).size + 1))
+        if (segments.isNotEmpty()) insertSetSegments(segments.map { it.copy(id = 0, workoutSetId = id) })
+        if (restSeconds != null) changeRestTimer("start", restSeconds, restRecommended)
+        return id
+    }
+
     @Transaction
     suspend fun changeRestTimer(action: String, seconds: Int = 0, recommended: String? = null) {
         val session = getActiveSessionSync() ?: return
