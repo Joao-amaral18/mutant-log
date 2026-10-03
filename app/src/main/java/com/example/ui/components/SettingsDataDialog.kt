@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -7,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -22,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.designsystem.MutantColors
 import com.example.ui.designsystem.MutantType
 import com.example.ui.designsystem.components.*
+import com.example.ui.viewmodel.ImportUiState
 import com.example.ui.viewmodel.MutantViewModel
 
 @Composable
@@ -33,6 +38,25 @@ fun SettingsDataDialog(
     val isExporting by viewModel.isExporting.collectAsState()
     val fileName = remember { viewModel.exportFileName() }
     val toast = LocalMutantToast.current
+    val importState by viewModel.importState.collectAsState()
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.previewImport(uri)
+    }
+
+    // The import flow takes over the sheet so two modal sheets never stack.
+    if (importState != ImportUiState.Idle) {
+        ImportBackupSheet(
+            state = importState,
+            onConfirm = viewModel::confirmImport,
+            onDismiss = {
+                val finished = importState is ImportUiState.Done
+                viewModel.dismissImport()
+                if (finished) onDismiss()
+            },
+            onShareBackup = { viewModel.shareSafetyBackup(context, it) }
+        )
+        return
+    }
 
     MutantBottomSheet(onDismiss = onDismiss, dismissible = !isExporting, modifier = Modifier.testTag("settings_sheet")) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -50,9 +74,9 @@ fun SettingsDataDialog(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(Icons.Outlined.FileDownload, contentDescription = null, tint = MutantColors.Primary, modifier = Modifier.size(22.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Export for analysis", style = MutantType.RowTitle.copy(fontSize = 15.sp), color = MutantColors.TextPrimary)
+                        Text("Export & back up", style = MutantType.RowTitle.copy(fontSize = 15.sp), color = MutantColors.TextPrimary)
                         Text(
-                            "Workouts, sets, program, bodyweight, cardio and recovery in one JSON file.",
+                            "Workouts, sets, programs, exercises, cardio and recovery in one JSON file. Import it later to restore.",
                             style = MutantType.BodySmall, color = MutantColors.TextSecondary
                         )
                     }
@@ -82,6 +106,35 @@ fun SettingsDataDialog(
                     height = 52.dp,
                     textStyle = MutantType.Button.copy(fontSize = 15.sp),
                     modifier = Modifier.fillMaxWidth().testTag("export_json_button")
+                )
+            }
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MutantColors.Background, RoundedCornerShape(18.dp))
+                    .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(18.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Outlined.FileUpload, contentDescription = null, tint = MutantColors.Primary, modifier = Modifier.size(22.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Import / restore", style = MutantType.RowTitle.copy(fontSize = 15.sp), color = MutantColors.TextPrimary)
+                        Text(
+                            "Restore from a Mutant Log JSON export. Merge adds what's missing; Replace restores the file exactly.",
+                            style = MutantType.BodySmall, color = MutantColors.TextSecondary
+                        )
+                    }
+                }
+                MutantButton(
+                    text = "Choose file",
+                    onClick = { picker.launch(arrayOf("application/json", "text/*", "application/octet-stream")) },
+                    style = MutantButtonStyle.Outline,
+                    icon = Icons.Outlined.FolderOpen,
+                    enabled = !isExporting,
+                    height = 52.dp,
+                    textStyle = MutantType.Button.copy(fontSize = 15.sp),
+                    modifier = Modifier.fillMaxWidth().testTag("import_json_button")
                 )
             }
         }

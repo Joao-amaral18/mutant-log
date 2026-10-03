@@ -7,6 +7,9 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.example.data.model.*
 
+/** Bump together with a migration; also written into exports so Import knows the source schema. */
+const val MUTANT_DB_VERSION = 6
+
 @Database(
     entities = [
         MuscleGroup::class,
@@ -24,7 +27,7 @@ import com.example.data.model.*
         SetSegment::class,
         CardioSession::class
     ],
-    version = 6,
+    version = MUTANT_DB_VERSION,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
