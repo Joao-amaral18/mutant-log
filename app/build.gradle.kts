@@ -14,8 +14,10 @@ android {
     applicationId = "com.aistudio.mutantlog.kzqpvw"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    // CI passes the run number so every release build upgrades the installed one; local builds stay at 1.
+    val ciVersion = System.getenv("VERSION_CODE")?.toIntOrNull()
+    versionCode = ciVersion ?: 1
+    versionName = if (ciVersion != null) "1.0.$ciVersion" else "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
