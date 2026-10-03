@@ -89,7 +89,8 @@ class ImportBackupSheetTest {
     @Test fun `errors are shown and running cannot be dismissed`() {
         val state = mutableStateOf<ImportUiState>(ImportUiState.Error("This isn't a Mutant Log export, or the file is damaged."))
         compose.setContent { MyApplicationTheme { ImportBackupSheet(state.value, {}, {}, {}) } }
-        compose.onNodeWithTag("import_error").assertTextContains("isn't a Mutant Log export", substring = true)
+        compose.onNodeWithTag("import_error").assertExists()
+        compose.onNodeWithText("isn't a Mutant Log export", substring = true).assertExists()
         state.value = ImportUiState.Running(ImportMode.MERGE)
         compose.onNodeWithTag("import_busy").assertExists()
         compose.onNodeWithText("Merging…").assertExists()
