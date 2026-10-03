@@ -29,7 +29,9 @@ internal object RestTimerAlerts {
     const val ACTION_SKIP = "com.example.action.REST_TIMER_SKIP"
 
     private const val ALARM_CHANNEL_ID = "rest_timer_alarm"
-    internal const val RUNNING_CHANNEL_ID = "rest_timer_running"
+    // Channel importance cannot change after creation, so the default-importance channel has a new id.
+    internal const val RUNNING_CHANNEL_ID = "rest_timer_running_v2"
+    private const val LEGACY_RUNNING_CHANNEL_ID = "rest_timer_running"
     private const val ALARM_NOTIFICATION_ID = 4101
     internal const val RUNNING_NOTIFICATION_ID = 4100
     private var completionListener: android.app.AlarmManager.OnAlarmListener? = null
@@ -159,15 +161,19 @@ internal object RestTimerAlerts {
         val runningChannel = NotificationChannel(
             RUNNING_CHANNEL_ID,
             "Workout rest countdown",
-            NotificationManager.IMPORTANCE_LOW
+            // Default importance keeps the live workout among the main notifications instead of the collapsed
+            // "Silent" section; it stays quiet because the channel has no sound or vibration.
+            NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "Shows the running rest countdown on the lock screen"
             setSound(null, null)
             enableVibration(false)
+            setShowBadge(false)
         }
         context.getSystemService(NotificationManager::class.java).apply {
             createNotificationChannel(alarmChannel)
             createNotificationChannel(runningChannel)
+            deleteNotificationChannel(LEGACY_RUNNING_CHANNEL_ID)
         }
     }
 

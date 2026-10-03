@@ -1,1 +1,2 @@
-<shape xmlns:android="http://schemas.android.com/apk/res/android"><solid android:color="#101016"/><corners android:radius="16dp"/></shape>
+<!-- Transparent: the colorized notification card already paints the background. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"><solid android:color="@android:color/transparent"/><corners android:radius="16dp"/></shape>

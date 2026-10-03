@@ -112,7 +112,9 @@ class WorkoutTimerService : Service() {
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(notificationViews(session, current, false))
             .setCustomBigContentView(notificationViews(session, current, true))
-            .setColor(0xFFAB78FF.toInt())
+            // A colorized foreground-service notification gets one solid card, header included: the closest an app
+            // can get to a media player's custom background without being a media session.
+            .setColor(0xFF17121F.toInt()).setColorized(true)
             .setSubText("Workout active")
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(activityIntent()).setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -120,7 +122,7 @@ class WorkoutTimerService : Service() {
             .setWhen(if (running) session.restDeadline!! else session.startedAt)
             .setUsesChronometer(running).setChronometerCountDown(running).setShowWhen(running)
             .setProgress(if (remaining > 0) session.restRemainingSeconds.coerceAtLeast(remaining) else 0, remaining, false)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
         return builder.build()
     }
     private fun notificationViews(session: WorkoutSession, current: WorkoutExerciseDetail?, expanded: Boolean): RemoteViews {
