@@ -1,0 +1,671 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-03T12:00:00Z",
+  "app": {
+    "name": "Mutant Log",
+    "version": "1.0.0",
+    "databaseVersion": 6
+  },
+  "profile": null,
+  "program": null,
+  "gyms": [],
+  "exerciseVariants": [],
+  "workouts": [],
+  "bodyweight": [],
+  "cardio": [],
+  "readiness": [],
+  "backup": {
+    "databaseVersion": 6,
+    "exercises": [
+      {
+        "id": 1001,
+        "stableId": "exercise_incline_chest_press",
+        "name": "Incline Machine Press — Panatta",
+        "muscleGroup": "Chest",
+        "source": "bundled"
+      },
+      {
+        "id": 1002,
+        "stableId": "exercise_flat_chest_press",
+        "name": "Horizontal Chest Press — Hammer Strength",
+        "muscleGroup": "Chest",
+        "source": "bundled"
+      },
+      {
+        "id": 1003,
+        "stableId": "exercise_cable_crossover_high",
+        "name": "Cable Crossover — High to Low",
+        "muscleGroup": "Chest",
+        "source": "bundled"
+      },
+      {
+        "id": 1004,
+        "stableId": "exercise_preacher_curl_prime",
+        "name": "Preacher Curl — Prime Plate Loaded",
+        "muscleGroup": "Biceps",
+        "source": "bundled"
+      },
+      {
+        "id": 1005,
+        "stableId": "exercise_cable_bicep_curl_dual",
+        "name": "Cable Bicep Curl — Dual Stack",
+        "muscleGroup": "Biceps",
+        "source": "bundled"
+      },
+      {
+        "id": 1006,
+        "stableId": "exercise_chest_supported_tbar_row",
+        "name": "Chest-Supported T-Bar Row — Arsenal",
+        "muscleGroup": "Back",
+        "source": "bundled"
+      },
+      {
+        "id": 1007,
+        "stableId": "exercise_lat_pulldown_neutral",
+        "name": "Neutral Grip Lat Pulldown — Nautilus",
+        "muscleGroup": "Back",
+        "source": "bundled"
+      },
+      {
+        "id": 1008,
+        "stableId": "exercise_hammer_high_row",
+        "name": "Hammer Strength Iso-Lateral High Row",
+        "muscleGroup": "Back",
+        "source": "bundled"
+      },
+      {
+        "id": 1009,
+        "stableId": "exercise_lat_prayer_pullover",
+        "name": "Cable Lat Prayer / Straight Arm Pulldown",
+        "muscleGroup": "Back",
+        "source": "bundled"
+      },
+      {
+        "id": 1010,
+        "stableId": "exercise_reverse_pec_deck",
+        "name": "Reverse Pec Deck Fly — Panatta",
+        "muscleGroup": "Delts",
+        "source": "bundled"
+      },
+      {
+        "id": 1011,
+        "stableId": "exercise_smith_shoulder_press",
+        "name": "Smith Machine Seated Shoulder Press",
+        "muscleGroup": "Delts",
+        "source": "bundled"
+      },
+      {
+        "id": 1012,
+        "stableId": "exercise_converging_chest_press",
+        "name": "Converging Chest Press — Prime",
+        "muscleGroup": "Chest",
+        "source": "bundled"
+      },
+      {
+        "id": 1013,
+        "stableId": "exercise_dips_chest",
+        "name": "Chest Dip — Bodyweight / Weighted",
+        "muscleGroup": "Chest",
+        "source": "bundled"
+      },
+      {
+        "id": 1014,
+        "stableId": "exercise_linear_hack_squat_cybex",
+        "name": "Linear Hack Squat — Cybex / Panatta",
+        "muscleGroup": "Quads",
+        "source": "bundled"
+      },
+      {
+        "id": 1015,
+        "stableId": "exercise_leg_extension_prime",
+        "name": "Leg Extension — Prime Smart Strength",
+        "muscleGroup": "Quads",
+        "source": "bundled"
+      },
+      {
+        "id": 1016,
+        "stableId": "exercise_glute_drive_nautilus",
+        "name": "Glute Drive Machine — Nautilus",
+        "muscleGroup": "Glutes",
+        "source": "bundled"
+      },
+      {
+        "id": 1017,
+        "stableId": "",
+        "name": "Standing Lateral Raise Machine",
+        "baseName": "Lateral Raise Machine",
+        "manufacturer": "Machine",
+        "muscleGroup": "Delts",
+        "movementPattern": "Abduction",
+        "defaultRepMin": 12,
+        "defaultRepMax": 15,
+        "defaultRir": 1,
+        "defaultWorkSets": 3,
+        "defaultRestSeconds": 120,
+        "defaultIncrementKg": 2.5,
+        "executionCues": "• First two sets straight\n• Last set: technical failure, rest 15–25 s, add strict reps (rest-pause)",
+        "source": "user"
+      },
+      {
+        "id": 1018,
+        "stableId": "",
+        "name": "Seated Vertical Chest Press",
+        "baseName": "Vertical Chest Press",
+        "manufacturer": "Machine",
+        "muscleGroup": "Chest",
+        "movementPattern": "Horizontal Press",
+        "defaultRepMin": 10,
+        "defaultRepMax": 12,
+        "defaultRir": 1,
+        "defaultWorkSets": 1,
+        "defaultRestSeconds": 150,
+        "defaultIncrementKg": 2.5,
+        "executionCues": "• Touch-up set only\n• Stable scapulae, no front-delt takeover",
+        "source": "user"
+      },
+      {
+        "id": 1019,
+        "stableId": "",
+        "name": "Cable Triceps Pushdown (EZ Bar)",
+        "baseName": "EZ Bar Pushdown",
+        "manufacturer": "Cable",
+        "muscleGroup": "Triceps",
+        "movementPattern": "Extension",
+        "defaultRepMin": 10,
+        "defaultRepMax": 15,
+        "defaultRir": 1,
+        "defaultWorkSets": 2,
+        "defaultRestSeconds": 120,
+        "defaultIncrementKg": 2.5,
+        "executionCues": "• Slow, controlled reps\n• No torso swing",
+        "source": "user"
+      },
+      {
+        "id": 1020,
+        "stableId": "",
+        "name": "Triceps Extension Machine",
+        "baseName": "Triceps Extension Machine",
+        "manufacturer": "Machine",
+        "muscleGroup": "Triceps",
+        "movementPattern": "Extension",
+        "defaultRepMin": 10,
+        "defaultRepMax": 15,
+        "defaultRir": 1,
+        "defaultWorkSets": 2,
+        "defaultRestSeconds": 120,
+        "defaultIncrementKg": 2.5,
+        "executionCues": "• Elbows fixed, full lockout\n• Controlled negative",
+        "source": "user"
+      },
+      {
+        "id": 1021,
+        "stableId": "",
+        "name": "Cable Triceps Pushdown (D-Handles)",
+        "baseName": "D-Handle Pushdown",
+        "manufacturer": "Cable",
+        "muscleGroup": "Triceps",
+        "movementPattern": "Extension",
+        "defaultRepMin": 12,
+        "defaultRepMax": 15,
+        "defaultRir": 1,
+        "defaultWorkSets": 1,
+        "defaultRestSeconds": 120,
+        "defaultIncrementKg": 2.5,
+        "executionCues": "• Elbows pinned to ribs",
+        "source": "user"
+      },
+      {
+        "id": 1022,
+        "stableId": "",
+        "name": "Single-Leg Lying Cable Leg Curl",
+        "baseName": "Lying Cable Leg Curl",
+        "manufacturer": "Cable",
+        "muscleGroup": "Hamstrings",
+        "movementPattern": "Unilateral Curl",
+        "defaultRepMin": 12,
+        "defaultRepMax": 15,
+        "defaultRir": 1,
+        "defaultWorkSets": 2,
+        "defaultRestSeconds": 120,
+        "defaultIncrementKg": 2.5,
+        "executionCues": "• 1–2 sets per leg\n• Hips stay on the bench",
+        "source": "user"
+      },
+      {
+        "id": 1023,
+        "stableId": "",
+        "name": "Drop Squat Machine",
+        "baseName": "Drop Squat",
+        "manufacturer": "Machine",
+        "muscleGroup": "Quads",
+        "movementPattern": "Squat",
+        "defaultRepMin": 12,
+        "defaultRepMax": 15,
+        "defaultRir": 1,
+        "defaultWorkSets": 2,
+        "defaultRestSeconds": 240,
+        "defaultIncrementKg": 5.0,
+        "executionCues": "• Ramp up: light ×15, moderate ×10–12, heavier ×6–8, near working ×3–5\n• 3–5 min before hard sets",
+        "source": "user"
+      },
+      {
+        "id": 1024,
+        "stableId": "",
+        "name": "Smith Romanian Deadlift",
+        "baseName": "Smith RDL",
+        "manufacturer": "Smith",
+        "muscleGroup": "Hamstrings",
+        "movementPattern": "Hinge",
+        "defaultRepMin": 10,
+        "defaultRepMax": 15,
+        "defaultRir": 1,
+        "defaultWorkSets": 2,
+        "defaultRestSeconds": 240,
+        "defaultIncrementKg": 5.0,
+        "executionCues": "• Stop the set when spine/pelvis position starts to break down\n• 3–5 min rest",
+        "source": "user"
+      },
+      {
+        "id": 1025,
+        "stableId": "",
+        "name": "Adductor Machine",
+        "baseName": "Adductor Machine",
+        "manufacturer": "Machine",
+        "muscleGroup": "Adductors",
+        "movementPattern": "Adduction",
+        "defaultRepMin": 12,
+        "defaultRepMax": 20,
+        "defaultRir": 1,
+        "defaultWorkSets": 2,
+        "defaultRestSeconds": 120,
+        "defaultIncrementKg": 2.5,
+        "executionCues": "• Slow and controlled",
+        "source": "user"
+      }
+    ],
+    "programs": [
+      {
+        "id": 1,
+        "name": "Nick Walker Protocol",
+        "description": "4 training days, 3 rest days. Machines, Smith, cables. 10–15 reps; legs 12–15. Last sets 0–1 RIR. Rest 2–3 min, 3–5 min on heavy legs.",
+        "isActive": true,
+        "source": "user"
+      }
+    ],
+    "programDays": [
+      {
+        "id": 100,
+        "programId": 1,
+        "dayIndex": 0,
+        "dayCode": "MON",
+        "title": "Chest + Biceps",
+        "isRestDay": false,
+        "description": "Max pec tension on stable movements; low-volume, high-quality biceps"
+      },
+      {
+        "id": 101,
+        "programId": 1,
+        "dayIndex": 1,
+        "dayCode": "TUE",
+        "title": "Back",
+        "isRestDay": false,
+        "description": "Stable pulldowns and rows; lats and scapular muscles limit the set"
+      },
+      {
+        "id": 102,
+        "programId": 1,
+        "dayIndex": 2,
+        "dayCode": "WED",
+        "title": "Rest",
+        "isRestDay": true,
+        "description": "Full rest from lifting"
+      },
+      {
+        "id": 103,
+        "programId": 1,
+        "dayIndex": 3,
+        "dayCode": "THU",
+        "title": "Shoulders + Triceps + Touch-ups",
+        "isRestDay": false,
+        "description": "High density: delts and triceps, one touch-up set each for chest and back"
+      },
+      {
+        "id": 104,
+        "programId": 1,
+        "dayIndex": 4,
+        "dayCode": "FRI",
+        "title": "Legs",
+        "isRestDay": false,
+        "description": "Main leg session: 12–15 reps, gradual warm-up, long rests on the heavy moves"
+      },
+      {
+        "id": 105,
+        "programId": 1,
+        "dayIndex": 5,
+        "dayCode": "SAT",
+        "title": "Rest",
+        "isRestDay": true,
+        "description": "Full rest from lifting"
+      },
+      {
+        "id": 106,
+        "programId": 1,
+        "dayIndex": 6,
+        "dayCode": "SUN",
+        "title": "Rest",
+        "isRestDay": true,
+        "description": "Full rest from lifting"
+      }
+    ],
+    "programExercises": [
+      {
+        "id": 1,
+        "programDayId": 100,
+        "exerciseId": 1001,
+        "orderIndex": 0,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 12,
+        "targetRir": 1,
+        "restSeconds": 150
+      },
+      {
+        "id": 2,
+        "programDayId": 100,
+        "exerciseId": 1002,
+        "orderIndex": 1,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 12,
+        "targetRir": 1,
+        "restSeconds": 150
+      },
+      {
+        "id": 3,
+        "programDayId": 100,
+        "exerciseId": 1003,
+        "orderIndex": 2,
+        "targetWorkSets": 2,
+        "repMin": 12,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 4,
+        "programDayId": 100,
+        "exerciseId": 1004,
+        "orderIndex": 3,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 5,
+        "programDayId": 100,
+        "exerciseId": 1005,
+        "orderIndex": 4,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 6,
+        "programDayId": 101,
+        "exerciseId": 1006,
+        "orderIndex": 0,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 150
+      },
+      {
+        "id": 7,
+        "programDayId": 101,
+        "exerciseId": 1007,
+        "orderIndex": 1,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 150
+      },
+      {
+        "id": 8,
+        "programDayId": 101,
+        "exerciseId": 1008,
+        "orderIndex": 2,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 150
+      },
+      {
+        "id": 9,
+        "programDayId": 101,
+        "exerciseId": 1009,
+        "orderIndex": 3,
+        "targetWorkSets": 2,
+        "repMin": 12,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 10,
+        "programDayId": 101,
+        "exerciseId": 1010,
+        "orderIndex": 4,
+        "targetWorkSets": 2,
+        "repMin": 12,
+        "repMax": 20,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 11,
+        "programDayId": 103,
+        "exerciseId": 1017,
+        "orderIndex": 0,
+        "targetWorkSets": 3,
+        "repMin": 12,
+        "repMax": 15,
+        "targetRir": 0,
+        "restSeconds": 120
+      },
+      {
+        "id": 12,
+        "programDayId": 103,
+        "exerciseId": 1011,
+        "orderIndex": 1,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 12,
+        "targetRir": 1,
+        "restSeconds": 150
+      },
+      {
+        "id": 13,
+        "programDayId": 103,
+        "exerciseId": 1012,
+        "orderIndex": 2,
+        "targetWorkSets": 1,
+        "repMin": 10,
+        "repMax": 12,
+        "targetRir": 1,
+        "restSeconds": 150
+      },
+      {
+        "id": 14,
+        "programDayId": 103,
+        "exerciseId": 1018,
+        "orderIndex": 3,
+        "targetWorkSets": 1,
+        "repMin": 10,
+        "repMax": 12,
+        "targetRir": 1,
+        "restSeconds": 150
+      },
+      {
+        "id": 15,
+        "programDayId": 103,
+        "exerciseId": 1003,
+        "orderIndex": 4,
+        "targetWorkSets": 1,
+        "repMin": 12,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 16,
+        "programDayId": 103,
+        "exerciseId": 1019,
+        "orderIndex": 5,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 17,
+        "programDayId": 103,
+        "exerciseId": 1020,
+        "orderIndex": 6,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 18,
+        "programDayId": 103,
+        "exerciseId": 1021,
+        "orderIndex": 7,
+        "targetWorkSets": 1,
+        "repMin": 12,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 19,
+        "programDayId": 103,
+        "exerciseId": 1006,
+        "orderIndex": 8,
+        "targetWorkSets": 1,
+        "repMin": 10,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 150
+      },
+      {
+        "id": 20,
+        "programDayId": 103,
+        "exerciseId": 1009,
+        "orderIndex": 9,
+        "targetWorkSets": 1,
+        "repMin": 12,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 21,
+        "programDayId": 103,
+        "exerciseId": 1013,
+        "orderIndex": 10,
+        "targetWorkSets": 1,
+        "repMin": 8,
+        "repMax": 15,
+        "targetRir": 0,
+        "restSeconds": 150
+      },
+      {
+        "id": 22,
+        "programDayId": 104,
+        "exerciseId": 1022,
+        "orderIndex": 0,
+        "targetWorkSets": 2,
+        "repMin": 12,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 23,
+        "programDayId": 104,
+        "exerciseId": 1023,
+        "orderIndex": 1,
+        "targetWorkSets": 2,
+        "repMin": 12,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 240
+      },
+      {
+        "id": 24,
+        "programDayId": 104,
+        "exerciseId": 1014,
+        "orderIndex": 2,
+        "targetWorkSets": 2,
+        "repMin": 12,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 240
+      },
+      {
+        "id": 25,
+        "programDayId": 104,
+        "exerciseId": 1024,
+        "orderIndex": 3,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 15,
+        "targetRir": 0,
+        "restSeconds": 240
+      },
+      {
+        "id": 26,
+        "programDayId": 104,
+        "exerciseId": 1015,
+        "orderIndex": 4,
+        "targetWorkSets": 2,
+        "repMin": 12,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 120
+      },
+      {
+        "id": 27,
+        "programDayId": 104,
+        "exerciseId": 1016,
+        "orderIndex": 5,
+        "targetWorkSets": 2,
+        "repMin": 10,
+        "repMax": 15,
+        "targetRir": 1,
+        "restSeconds": 150
+      },
+      {
+        "id": 28,
+        "programDayId": 104,
+        "exerciseId": 1025,
+        "orderIndex": 6,
+        "targetWorkSets": 2,
+        "repMin": 12,
+        "repMax": 20,
+        "targetRir": 1,
+        "restSeconds": 120
+      }
+    ]
+  }
+}

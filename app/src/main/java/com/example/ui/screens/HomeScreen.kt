@@ -126,16 +126,17 @@ fun HomeScreen(
 
     val selectedGymIndex = allGyms.indexOfFirst { it.id == selectedGym?.id }.coerceAtLeast(0)
     val weekRows = buildWeekRows(programDays, finishedWorkouts, recommendedProgramDay?.id, nowMillis)
-    val openDay: (ProgramDay) -> Unit = { day ->
-        val row = weekRows.firstOrNull { it.day.id == day.id }
-        when {
-            row?.status == WeekDayStatus.DONE -> onNavigateToHistory()
-            activeSession != null -> onNavigateToActiveWorkout()
-            else -> {
-                selectedDayToStart = day
-                showReadinessDialog = true
-            }
+    // Start always starts: the recommended day can already be done this week once the routine cycles.
+    val startDay: (ProgramDay) -> Unit = { day ->
+        if (activeSession != null) onNavigateToActiveWorkout()
+        else {
+            selectedDayToStart = day
+            showReadinessDialog = true
         }
+    }
+    // Tapping a week row that is already done shows that workout in History instead.
+    val openDay: (ProgramDay) -> Unit = { day ->
+        if (weekRows.firstOrNull { it.day.id == day.id }?.status == WeekDayStatus.DONE) onNavigateToHistory() else startDay(day)
     }
 
     LazyColumn(
@@ -184,7 +185,7 @@ fun HomeScreen(
                     },
                     isStarting = isStarting,
                     startError = startError,
-                    onStart = recommendedProgramDay?.let { day -> { openDay(day) } },
+                    onStart = recommendedProgramDay?.let { day -> { startDay(day) } },
                     onResume = onNavigateToActiveWorkout,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )

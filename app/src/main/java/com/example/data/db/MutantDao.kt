@@ -632,6 +632,9 @@ interface MutantDao {
     @Update
     suspend fun updateProgram(program: Program)
 
+    @Query("UPDATE programs SET isActive = 0")
+    suspend fun deactivateAllPrograms()
+
     @Query("DELETE FROM cardio_sessions")
     suspend fun deleteAllCardio()
 
