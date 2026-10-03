@@ -90,7 +90,9 @@ fun legacyToBackup(export: AnalysisExport, databaseVersion: Int): BackupExport {
             sorenessScore = readiness?.soreness ?: 2,
             motivationScore = readiness?.motivation ?: 5,
             jointDiscomfort = JointLabels.getOrElse(readiness?.jointDiscomfort ?: 0) { "None" },
-            readinessStatus = readiness?.notes ?: "Normal"
+            readinessStatus = readiness?.notes ?: "Normal",
+            jointArea = readiness?.jointAreas.orEmpty().joinToString(", "),
+            readinessNote = readiness?.note.orEmpty()
         )
         w.exercises.forEach { we ->
             val exerciseId = exerciseFor(we.exerciseId, we.name) ?: return@forEach

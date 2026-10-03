@@ -213,7 +213,10 @@ class AnalysisExportRepositoryImpl(
                     else -> 0
                 },
                 stress = null,
-                notes = session.readinessStatus.ifEmpty { null }
+                notes = session.readinessStatus.ifEmpty { null },
+                jointDiscomfortLevel = session.jointDiscomfort.lowercase().ifBlank { "none" },
+                jointAreas = session.jointArea.split(',').map { it.trim() }.filter { it.isNotEmpty() },
+                note = session.readinessNote.ifBlank { null }
             )
         }
 

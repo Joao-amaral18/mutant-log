@@ -249,7 +249,17 @@ data class ReadinessExport(
     val jointDiscomfort: Int?,
     val stress: Int?,
 
-    val notes: String?
+    // Computed readiness status ("Normal", "Accumulated fatigue detected").
+    val notes: String?,
+
+    // Every value here comes from the check-in before the workout started, not from the workout itself.
+    val measured: String = "pre_session",
+    // "none", "mild", "moderate" or "severe"; the same as jointDiscomfort 0–3.
+    val jointDiscomfortLevel: String? = null,
+    // Joints the user marked, e.g. ["Elbow"].
+    val jointAreas: List<String> = emptyList(),
+    // The user's own note, e.g. "elbow, since biceps day".
+    val note: String? = null
 )
 
 @Serializable

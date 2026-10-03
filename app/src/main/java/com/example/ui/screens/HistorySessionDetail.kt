@@ -32,6 +32,19 @@ internal fun HistorySessionDetail(workout: HistoryWorkout, all: List<HistoryWork
                 Text("${historyDate(workout.session.startedAt, "HH:mm")} → ${historyDate(requireNotNull(workout.session.finishedAt), "HH:mm")} · ${historyDuration(workout.minutes)}",
                     style = MutantType.Body, color = MutantColors.TextSecondary, modifier = Modifier.padding(top = 6.dp, bottom = 12.dp))
                 HistoryMetrics(listOf("Sets" to workout.sets.size.toString(), "Reps" to workout.reps.toString(), "Volume" to "${historyNumber(workout.volume)} kg", "PRs" to workout.prs.toString()))
+                // The check-in happens before the workout: say so, so a joint issue isn't read as caused by this session.
+                val s = workout.session
+                if (!s.jointDiscomfort.equals("None", ignoreCase = true) || s.readinessNote.isNotBlank()) {
+                    Text(
+                        "Before this workout: " + listOfNotNull(
+                            s.jointDiscomfort.takeIf { !it.equals("None", ignoreCase = true) }?.let { "${it.lowercase()} joint discomfort" },
+                            s.jointArea.ifBlank { null },
+                            s.readinessNote.ifBlank { null }?.let { "\u201C$it\u201D" }
+                        ).joinToString(" · "),
+                        style = MutantType.BodySmall, color = MutantColors.Warning,
+                        modifier = Modifier.padding(top = 10.dp).testTag("history_pre_session")
+                    )
+                }
                 editError?.let { Text(it, color = MutantColors.Error) }
             }
             items(workout.exercises, key = { it.workoutExercise.id }) { ex ->

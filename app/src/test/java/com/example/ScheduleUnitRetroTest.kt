@@ -120,4 +120,53 @@ class ScheduleUnitRetroTest {
             helper.close()
         }
     }
+
+    @Test fun `check-in joint detail is stored and exported as pre-session`() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, MutantDatabase::class.java).allowMainThreadQueries().build()
+        try {
+            val dao = db.mutantDao()
+            val program = dao.insertProgram(Program(name = "Split"))
+            val day = dao.insertProgramDay(ProgramDay(programId = program, dayIndex = 4, dayCode = "FRI", title = "Legs"))
+            val repo = MutantRepository(dao)
+            val id = repo.startWorkoutSession(dao.getProgramDayById(day)!!, 1,
+                ReadinessInput(jointDiscomfort = "Moderate", jointAreas = setOf("Elbow"), note = "elbow, since biceps day"))
+            repo.finishWorkout(id)
+            val session = dao.getSessionSync(id)!!
+            assertEquals("Elbow", session.jointArea)
+            assertEquals("elbow, since biceps day", session.readinessNote)
+            val r = com.example.data.repository.AnalysisExportRepositoryImpl(dao).buildExport().readiness.single()
+            assertEquals("pre_session", r.measured)
+            assertEquals("moderate", r.jointDiscomfortLevel)
+            assertEquals(2, r.jointDiscomfort)
+            assertEquals(listOf("Elbow"), r.jointAreas)
+            assertEquals("elbow, since biceps day", r.note)
+            // No discomfort: joints are not kept even if some were tapped earlier.
+            val clean = repo.startWorkoutSession(dao.getProgramDayById(day)!!, 1, ReadinessInput(jointAreas = setOf("Knee")))
+            assertEquals("", dao.getSessionSync(clean)!!.jointArea)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test fun `migration 7 to 8 adds joint area and note`() {
+        val helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context).name(null)
+                .callback(object : SupportSQLiteOpenHelper.Callback(7) {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        db.execSQL("CREATE TABLE workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, title TEXT NOT NULL)")
+                    }
+                    override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+                }).build()
+        )
+        try {
+            val db = helper.writableDatabase
+            db.execSQL("INSERT INTO workout_sessions (title) VALUES ('Legs')")
+            MutantDatabase.MIGRATION_7_8.migrate(db)
+            db.query("SELECT jointArea, readinessNote FROM workout_sessions").use {
+                it.moveToFirst(); assertEquals("", it.getString(0)); assertEquals("", it.getString(1))
+            }
+        } finally {
+            helper.close()
+        }
+    }
 }

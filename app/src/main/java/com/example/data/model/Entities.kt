@@ -225,8 +225,14 @@ data class WorkoutSession(
     // 0–100 from the pre-workout check-in; null for sessions logged before it existed.
     val readinessScore: Int? = null,
     // Logged after the fact: startedAt and durationMinutes were entered by the user, set times are spread over them.
-    val isRetroactive: Boolean = false
+    val isRetroactive: Boolean = false,
+    // Pre-workout check-in detail: which joints hurt (comma-separated JointAreas) and the user's own note.
+    val jointArea: String = "",
+    val readinessNote: String = ""
 )
+
+/** Joints offered by the readiness check-in. */
+val JointAreas = listOf("Shoulder", "Elbow", "Wrist", "Lower back", "Hip", "Knee", "Ankle", "Neck")
 
 @Entity(
     tableName = "workout_exercises",
