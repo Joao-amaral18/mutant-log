@@ -24,6 +24,9 @@ import com.example.ui.designsystem.MutantColors
 import com.example.ui.designsystem.MutantType
 import com.example.ui.designsystem.components.*
 import com.example.data.model.JointDiscomfortLevels
+import com.example.data.model.JointAreas
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import com.example.data.model.ReadinessBand
 import com.example.data.model.readinessBand
 
@@ -77,7 +80,7 @@ fun ReadinessDialog(
                         MutantChoiceChip(
                             label = level,
                             selected = input.jointDiscomfort.equals(level, ignoreCase = true),
-                            onClick = { input = input.copy(jointDiscomfort = level) },
+                            onClick = { input = input.copy(jointDiscomfort = level, jointAreas = if (level == "None") emptySet() else input.jointAreas) },
                             modifier = Modifier.weight(1f).testTag("readiness_joint_$level"),
                             height = 44.dp, cornerRadius = 12.dp, horizontalPadding = 0.dp,
                             textStyle = MutantType.Chip.copy(fontSize = 13.sp)
@@ -85,6 +88,25 @@ fun ReadinessDialog(
                     }
                 }
             }
+            // Where it hurts, so the history shows it was there before this workout and where it came from.
+            if (!input.jointDiscomfort.equals("None", ignoreCase = true)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Where?", style = MutantType.RowTitle.copy(fontSize = 14.sp), color = MutantColors.TextPrimary)
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        JointAreas.forEach { area ->
+                            MutantChoiceChip(
+                                label = area, selected = area in input.jointAreas,
+                                onClick = { input = input.copy(jointAreas = if (area in input.jointAreas) input.jointAreas - area else input.jointAreas + area) },
+                                modifier = Modifier.testTag("readiness_area_$area")
+                            )
+                        }
+                    }
+                }
+            }
+            MutantTextField(
+                "NOTE", input.note, { input = input.copy(note = it.take(200)) },
+                placeholder = "e.g. elbow, since biceps day", testTag = "readiness_note"
+            )
             ScaleRow("Focus", listOf("None", "Low", "OK", "High", "Locked in"), input.motivation, "focus") { input = input.copy(motivation = it) }
 
             Row(

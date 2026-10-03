@@ -215,12 +215,13 @@ fun ActiveWorkoutScreen(
     }
 
     if (sheet == SessionSheet.FINISH) {
-        val volume = state.exercises.sumOf { d ->
+        // Stack-pin loads are positions, not kilograms, so they stay out of the kg volume.
+        val volume = state.exercises.filterNot { it.exercise.usesStack }.sumOf { d ->
             d.sets.filter { it.setType == SetType.WORK }.sumOf { (it.weightKg * it.reps).toDouble() }
         }.toFloat()
         FinishSessionSheet(
             title = session.title,
-            elapsedMinutes = viewModel.workoutClock.value.elapsedSeconds / 60,
+            elapsedMinutes = if (session.isRetroactive) session.durationMinutes.toLong() else viewModel.workoutClock.value.elapsedSeconds / 60,
             doneSets = loggedSets,
             totalSets = state.exercises.sumOf { it.sessionSets },
             volumeKg = volume,
@@ -370,6 +371,8 @@ fun ActiveWorkoutScreen(
         onAddSet = { viewModel.addPlannedSet(workoutExercise.id) { toast.show(it) } },
         onOpenList = { listOpen = true },
         elapsedSeconds = { clock.value.elapsedSeconds },
+        pastWorkoutLabel = session?.takeIf { it.isRetroactive }?.let { pastWorkoutLabel(it) },
+        onLoadUnitChange = { viewModel.setExerciseLoadUnit(exercise.id, it) },
         onLogSet = {
             val weight = weightInput.toFloatOrNull()
             val reps = repsInput.toIntOrNull()
@@ -431,3 +434,9 @@ fun ActiveWorkoutScreen(
 }
 
 private const val NextSetSaveDelayMs = 400L
+
+/** "Past · Sat 3 Oct, 08:30 · 60 min" for a workout being logged after the fact. */
+internal fun pastWorkoutLabel(session: com.example.data.model.WorkoutSession): String =
+    "Past · " + java.text.SimpleDateFormat("EEE d MMM, HH:mm", java.util.Locale.US).format(java.util.Date(session.startedAt)) +
+        " · ${session.durationMinutes} min"
+

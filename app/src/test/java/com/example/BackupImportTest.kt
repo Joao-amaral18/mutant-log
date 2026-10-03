@@ -327,6 +327,7 @@ class BackupImportTest {
         assertEquals("only the exercises missing from the catalog are added", 9, result.addedExercises)
         val active = dao.getAllProgramsSync().single { it.isActive }
         assertEquals("Nick Walker Protocol", active.name)
+        assertTrue("the protocol runs as a rotation", active.isRotation)
         val days = dao.getProgramDaysForProgramSync(active.id)
         assertEquals(listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"), days.map { it.dayCode })
         assertEquals(3, days.count { it.isRestDay })

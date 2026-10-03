@@ -635,6 +635,25 @@ interface MutantDao {
     @Query("UPDATE programs SET isActive = 0")
     suspend fun deactivateAllPrograms()
 
+    @Query("UPDATE exercises SET loadUnit = :unit WHERE id = :id")
+    suspend fun setExerciseLoadUnit(id: Long, unit: String)
+
+    @Query("UPDATE programs SET scheduleMode = :mode WHERE id = :id")
+    suspend fun setProgramScheduleMode(id: Long, mode: String)
+
+    /**
+     * Gives a retro-logged session believable set times: sets keep their logged order and are spread evenly
+     * between [from] and [to], so rest times and duration in history and exports reflect the real workout.
+     */
+    @Transaction
+    suspend fun spreadSetTimes(sessionId: Long, from: Long, to: Long) {
+        val sets = getWorkoutDetailsSync(sessionId).sortedBy { it.workoutExercise.orderIndex }
+            .flatMap { detail -> detail.sets.sortedWith(compareBy<WorkoutSet> { it.completedAt }.thenBy { it.setNumber }) }
+        if (sets.isEmpty() || to <= from) return
+        val step = (to - from) / (sets.size + 1)
+        sets.forEachIndexed { index, set -> updateWorkoutSet(set.copy(completedAt = from + step * (index + 1))) }
+    }
+
     @Query("DELETE FROM cardio_sessions")
     suspend fun deleteAllCardio()
 

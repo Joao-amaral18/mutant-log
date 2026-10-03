@@ -78,6 +78,31 @@ fun buildWeekRows(
     }
 }
 
+/**
+ * Rows for a rotation: training days in order, no weekdays. A day is done once it has been trained since the
+ * rotation last went round; when every day is done the next cycle starts empty.
+ */
+fun buildRotationRows(days: List<ProgramDay>, finished: List<WorkoutSession>, recommendedDayId: Long?): List<WeekDayRow> {
+    val training = days.filterNot { it.isRestDay }.sortedWith(compareBy<ProgramDay> { it.dayIndex }.thenBy { it.id })
+    val ids = training.mapTo(HashSet()) { it.id }
+    val done = LinkedHashMap<Long, WorkoutSession>()
+    for (session in finished.sortedByDescending { it.finishedAt ?: it.startedAt }) {
+        val dayId = session.programDayId?.takeIf { it in ids } ?: continue
+        if (dayId in done) break
+        done[dayId] = session
+    }
+    if (done.size == training.size) done.clear()
+    return training.mapIndexed { index, day ->
+        val session = done[day.id]
+        val status = when {
+            session != null -> WeekDayStatus.DONE
+            day.id == recommendedDayId -> WeekDayStatus.NEXT
+            else -> WeekDayStatus.PLANNED
+        }
+        WeekDayRow(day, "#${index + 1}", 0, status, session?.durationMinutes)
+    }
+}
+
 fun todayLabel(nowMillis: Long, timeZone: TimeZone = TimeZone.getDefault()): String {
     val calendar = Calendar.getInstance(timeZone).apply { timeInMillis = nowMillis }
     return "${WeekdayCodes[(calendar.get(Calendar.DAY_OF_WEEK) + 5) % 7]} ${calendar.get(Calendar.DAY_OF_MONTH)}"
@@ -204,11 +229,23 @@ fun ProgressTrack(fraction: Float, modifier: Modifier = Modifier, height: androi
 }
 
 @Composable
-fun WeekHeader(sessions: Int, restDays: Int, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-        Text("This week", style = MutantType.SectionTitle, color = MutantColors.TextPrimary)
-        MutantEyebrow("$sessions SESSIONS · $restDays REST", color = MutantColors.TextSecondary,
-            style = MutantType.MonoLabel.copy(letterSpacing = 0.sp))
+fun WeekHeader(
+    sessions: Int,
+    restDays: Int,
+    modifier: Modifier = Modifier,
+    rotation: Boolean = false,
+    onScheduleModeChange: ((rotation: Boolean) -> Unit)? = null
+) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+            Text(if (rotation) "Rotation" else "This week", style = MutantType.SectionTitle, color = MutantColors.TextPrimary)
+            MutantEyebrow(if (rotation) "$sessions SESSIONS · REST AS NEEDED" else "$sessions SESSIONS · $restDays REST",
+                color = MutantColors.TextSecondary, style = MutantType.MonoLabel.copy(letterSpacing = 0.sp))
+        }
+        if (onScheduleModeChange != null) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            MutantChoiceChip("Fixed weekdays", !rotation, { onScheduleModeChange(false) }, modifier = Modifier.testTag("schedule_weekdays"))
+            MutantChoiceChip("Rotation", rotation, { onScheduleModeChange(true) }, modifier = Modifier.testTag("schedule_rotation"))
+        }
     }
 }
 
@@ -266,7 +303,7 @@ fun WeekDayItem(
     ) {
         Column(Modifier.width(34.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(row.weekdayCode, style = MutantType.MonoLabel.copy(fontWeight = FontWeight.SemiBold), color = accent)
-            Text("${row.dateOfMonth}", style = MutantType.MonoLabel.copy(fontWeight = FontWeight.Normal), color = MutantColors.TextMetadata)
+            if (row.dateOfMonth > 0) Text("${row.dateOfMonth}", style = MutantType.MonoLabel.copy(fontWeight = FontWeight.Normal), color = MutantColors.TextMetadata)
         }
         Surface(onClick = onOpen, color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.weight(1f)) {
             Column(Modifier.padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {

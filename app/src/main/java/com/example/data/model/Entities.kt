@@ -53,8 +53,14 @@ data class Exercise(
     val handlePosition: String = "",
     val notes: String = "",
     val source: String = "bundled", // "bundled" or "user"
-    val isArchived: Boolean = false
+    val isArchived: Boolean = false,
+    // LOAD_UNIT_KG or LOAD_UNIT_STACK: pin-loaded machines are logged by stack position, not kilograms.
+    val loadUnit: String = LOAD_UNIT_KG
 )
+
+const val LOAD_UNIT_KG = "KG"
+const val LOAD_UNIT_STACK = "STACK"
+val Exercise.usesStack: Boolean get() = loadUnit == LOAD_UNIT_STACK
 
 // --- 4. REFERENCE DATA: Exercise Variants ---
 @Entity(
@@ -132,8 +138,14 @@ data class Program(
     // Position of the last completed training day within the non-rest sequence.
     val currentRoutinePosition: Int = -1,
     val lastCompletedSessionId: Long? = null,
-    val lastCompletedAt: Long? = null
+    val lastCompletedAt: Long? = null,
+    // SCHEDULE_WEEKDAYS: each training day has a fixed weekday. SCHEDULE_ROTATION: days run in order, rest when needed.
+    val scheduleMode: String = SCHEDULE_WEEKDAYS
 )
+
+const val SCHEDULE_WEEKDAYS = "WEEKDAYS"
+const val SCHEDULE_ROTATION = "ROTATION"
+val Program.isRotation: Boolean get() = scheduleMode == SCHEDULE_ROTATION
 
 @Entity(tableName = "program_days")
 @Serializable
@@ -211,8 +223,16 @@ data class WorkoutSession(
     // Length of the current rest period, so progress survives +30 / -15 adjustments.
     val restTotalSeconds: Int = 0,
     // 0–100 from the pre-workout check-in; null for sessions logged before it existed.
-    val readinessScore: Int? = null
+    val readinessScore: Int? = null,
+    // Logged after the fact: startedAt and durationMinutes were entered by the user, set times are spread over them.
+    val isRetroactive: Boolean = false,
+    // Pre-workout check-in detail: which joints hurt (comma-separated JointAreas) and the user's own note.
+    val jointArea: String = "",
+    val readinessNote: String = ""
 )
+
+/** Joints offered by the readiness check-in. */
+val JointAreas = listOf("Shoulder", "Elbow", "Wrist", "Lower back", "Hip", "Knee", "Ankle", "Neck")
 
 @Entity(
     tableName = "workout_exercises",

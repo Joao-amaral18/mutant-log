@@ -56,7 +56,11 @@ class AnalysisExportRepositoryImpl(
             )
         }
 
-        val programDaysExport = programDays.map { day ->
+        // The analysis view describes the active program only; every program is still in the backup section.
+        val programs = dao.getAllProgramsSync()
+        val activeProgram = programs.filter { it.isActive }.maxByOrNull { it.id }
+        val activeDays = programDays.filter { it.programId == activeProgram?.id }
+        val programDaysExport = activeDays.map { day ->
             val dayExercises = programExercisesByDayId[day.id] ?: emptyList()
             ProgramDayExport(
                 id = "day-${day.id}",
@@ -84,9 +88,9 @@ class AnalysisExportRepositoryImpl(
         }
 
         val programExport = ProgramExport(
-            id = "program-nick-walker-reconstruction",
-            name = "Nick Walker Reconstruction",
-            startedAt = workouts.firstOrNull()?.startedAt?.let { isoFormat.format(Date(it)) },
+            id = "program-${activeProgram?.id ?: 0}",
+            name = activeProgram?.name ?: "No active program",
+            startedAt = activeProgram?.createdAt?.let { isoFormat.format(Date(it)) },
             days = programDaysExport
         )
 
@@ -125,6 +129,7 @@ class AnalysisExportRepositoryImpl(
                 startedAt = isoFormat.format(Date(session.startedAt)),
                 finishedAt = session.finishedAt?.let { isoFormat.format(Date(it)) },
                 bodyweightKg = if (session.bodyweight > 0f) session.bodyweight.toDouble() else null,
+                retroactive = session.isRetroactive,
                 exercises = wExercises.map { we ->
                     val ex = exerciseMap[we.exerciseId]
                     val wSets = setsByWorkoutExerciseId[we.id] ?: emptyList()
@@ -166,6 +171,7 @@ class AnalysisExportRepositoryImpl(
                                 performedAt = isoFormat.format(Date(s.completedAt)),
                                 restAfterSeconds = ex?.defaultRestSeconds,
                                 technique = s.technique.name.lowercase(),
+                                loadUnit = if (ex?.usesStack == true) "stack_pin" else "kg",
                                 segments = segs.map { seg ->
                                     SetSegmentExport(
                                         sequence = seg.segmentIndex,
@@ -207,7 +213,10 @@ class AnalysisExportRepositoryImpl(
                     else -> 0
                 },
                 stress = null,
-                notes = session.readinessStatus.ifEmpty { null }
+                notes = session.readinessStatus.ifEmpty { null },
+                jointDiscomfortLevel = session.jointDiscomfort.lowercase().ifBlank { "none" },
+                jointAreas = session.jointArea.split(',').map { it.trim() }.filter { it.isNotEmpty() },
+                note = session.readinessNote.ifBlank { null }
             )
         }
 
@@ -241,7 +250,7 @@ class AnalysisExportRepositoryImpl(
             gymEquipment = dao.getAllGymEquipmentSync(),
             machineCatalog = dao.getUserMachinesSync(),
             exerciseVariants = dao.getUserExerciseVariantsSync(),
-            programs = dao.getAllProgramsSync(),
+            programs = programs,
             programDays = programDays,
             programExercises = programExercises,
             workoutSessions = finished,

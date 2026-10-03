@@ -44,7 +44,9 @@ object WorkoutRecommendationEngine {
         lastWorkout: WorkoutSession?,
         persistedPosition: Int = -1,
         nowMillis: Long = System.currentTimeMillis(),
-        timeZone: TimeZone = TimeZone.getDefault()
+        timeZone: TimeZone = TimeZone.getDefault(),
+        // A rotation has no weekday to fall back on: with no history it starts at its first training day.
+        rotation: Boolean = false
     ): WorkoutRecommendation {
         val trainingDays = programDays
             .filterNot { it.isRestDay }
@@ -60,6 +62,7 @@ object WorkoutRecommendationEngine {
         val (nextPosition, basis) = when {
             historicalPosition >= 0 -> ((historicalPosition + 1) % trainingDays.size) to RecommendationBasis.HISTORY
             persistedPosition in trainingDays.indices -> ((persistedPosition + 1) % trainingDays.size) to RecommendationBasis.PERSISTED_POSITION
+            rotation -> 0 to RecommendationBasis.PERSISTED_POSITION
             else -> calendarFallbackPosition(trainingDays, nowMillis, timeZone) to RecommendationBasis.LOCAL_CALENDAR
         }
 

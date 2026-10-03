@@ -4,7 +4,7 @@
   "app": {
     "name": "Mutant Log",
     "version": "1.0.0",
-    "databaseVersion": 6
+    "databaseVersion": 7
   },
   "profile": null,
   "program": null,
@@ -15,7 +15,7 @@
   "cardio": [],
   "readiness": [],
   "backup": {
-    "databaseVersion": 6,
+    "databaseVersion": 7,
     "exercises": [
       {
         "id": 1001,
@@ -289,7 +289,8 @@
         "name": "Nick Walker Protocol",
         "description": "4 training days, 3 rest days. Machines, Smith, cables. 10–15 reps; legs 12–15. Last sets 0–1 RIR. Rest 2–3 min, 3–5 min on heavy legs.",
         "isActive": true,
-        "source": "user"
+        "source": "user",
+        "scheduleMode": "ROTATION"
       }
     ],
     "programDays": [

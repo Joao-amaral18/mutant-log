@@ -35,8 +35,11 @@ object ProgressionEngine {
         targetRir: Int = 0,
         incrementKg: Float = 2.5f,
         lastExecutionQuality: String = "Good",
-        lastTargetMuscleQuality: String = "Good"
+        lastTargetMuscleQuality: String = "Good",
+        // Pin-loaded machines: loads are stack positions, so texts say "pin 8" instead of "8 kg".
+        stack: Boolean = false
     ): ProgressionRecommendation {
+        fun load(v: Float) = if (stack) "pin ${v.formatLoad()}" else "${v.formatLoad()} kg"
         val workSets = lastWorkSets.filter { it.setType == SetType.WORK }
 
         if (workSets.isEmpty()) {
@@ -56,7 +59,7 @@ object ProgressionEngine {
         val historySummaries = workSets.map {
             SetSummary(it.weightKg, it.reps, it.rir, isWorkSet = true, technique = it.technique)
         }
-        val prevPerfString = workSets.joinToString(separator = ", ") { "${it.weightKg.formatLoad()} kg × ${it.reps} @${it.rir}RIR" }
+        val prevPerfString = workSets.joinToString(separator = ", ") { "${load(it.weightKg)} × ${it.reps} @${it.rir}RIR" }
 
         val isExecutionCompromised = lastExecutionQuality.equals("Compromised", ignoreCase = true) ||
                 lastExecutionQuality.equals("Bad", ignoreCase = true)
@@ -71,9 +74,9 @@ object ProgressionEngine {
                 targetRir = targetRir,
                 status = ProgressionStatus.DELOAD_OR_CONSOLIDATE,
                 reason = if (isExecutionCompromised)
-                    "Execution compromised last time. Maintain ${baseWeight.formatLoad()} kg to rebuild strict biomechanics."
+                    "Execution compromised last time. Maintain ${load(baseWeight)} to rebuild strict biomechanics."
                 else
-                    "Target muscle stimulation was weak. Consolidate execution and mind-muscle connection at ${baseWeight.formatLoad()} kg.",
+                    "Target muscle stimulation was weak. Consolidate execution and mind-muscle connection at ${load(baseWeight)}.",
                 previousPerformance = prevPerfString,
                 historyWorkSets = historySummaries
             )
@@ -91,7 +94,7 @@ object ProgressionEngine {
                 suggestedRepsMax = repMax,
                 targetRir = targetRir,
                 status = ProgressionStatus.INCREASE_LOAD,
-                reason = "All work sets hit top bracket (≥$repMax reps) with clean execution. Progressive overload triggered: +${incrementKg.formatLoad()} kg.",
+                reason = "All work sets hit top bracket (≥$repMax reps) with clean execution. Progressive overload triggered: +${incrementKg.formatLoad()}${if (stack) " pin" else " kg"}.",
                 previousPerformance = prevPerfString,
                 historyWorkSets = historySummaries
             )
@@ -103,7 +106,7 @@ object ProgressionEngine {
                 suggestedRepsMax = repMax,
                 targetRir = targetRir,
                 status = ProgressionStatus.MAINTAIN_LOAD,
-                reason = "Target bracket ($repMin–$repMax reps) in progress (lowest set: $minRepsLogged reps). Dominate ${baseWeight.formatLoad()} kg across all sets before increasing load.",
+                reason = "Target bracket ($repMin–$repMax reps) in progress (lowest set: $minRepsLogged reps). Dominate ${load(baseWeight)} across all sets before increasing load.",
                 previousPerformance = prevPerfString,
                 historyWorkSets = historySummaries
             )

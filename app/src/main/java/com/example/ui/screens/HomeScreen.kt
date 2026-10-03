@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.*
 import com.example.R
 import com.example.ui.components.ReadinessDialog
+import com.example.ui.components.PastWorkoutSheet
+import com.example.ui.designsystem.MutantType
 import com.example.ui.components.SettingsDataDialog
 import com.example.ui.components.GymPickerSheet
 import com.example.ui.components.AddProgramExerciseSheet
@@ -82,6 +84,9 @@ fun HomeScreen(
     var showAddExerciseDialog by remember { mutableStateOf(false) }
     var showCreateVariantDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showPastWorkout by remember { mutableStateOf(false) }
+    val activeProgram by viewModel.activeProgram.collectAsState(initial = null)
+    val rotation = activeProgram?.isRotation == true
     var targetProgramDayId by remember { mutableStateOf<Long?>(null) }
     var selectedExerciseForVariant by remember { mutableStateOf<Exercise?>(null) }
 
@@ -125,7 +130,8 @@ fun HomeScreen(
     }
 
     val selectedGymIndex = allGyms.indexOfFirst { it.id == selectedGym?.id }.coerceAtLeast(0)
-    val weekRows = buildWeekRows(programDays, finishedWorkouts, recommendedProgramDay?.id, nowMillis)
+    val weekRows = if (rotation) buildRotationRows(programDays, finishedWorkouts, recommendedProgramDay?.id)
+        else buildWeekRows(programDays, finishedWorkouts, recommendedProgramDay?.id, nowMillis)
     // Start always starts: the recommended day can already be done this week once the routine cycles.
     val startDay: (ProgramDay) -> Unit = { day ->
         if (activeSession != null) onNavigateToActiveWorkout()
@@ -181,7 +187,7 @@ fun HomeScreen(
                     recoveryText = systemStatus.recoveryDaysText,
                     readinessScore = systemStatus.lastReadinessScore,
                     activeSession = activeSession?.let {
-                        ActiveSessionProgress(it.title, { clock.value.elapsedSeconds }, doneSets, totalSets)
+                        ActiveSessionProgress(it.title, { if (it.isRetroactive) it.durationMinutes * 60L else clock.value.elapsedSeconds }, doneSets, totalSets)
                     },
                     isStarting = isStarting,
                     startError = startError,
@@ -194,6 +200,10 @@ fun HomeScreen(
                 WeekHeader(
                     sessions = programDays.count { !it.isRestDay },
                     restDays = programDays.count { it.isRestDay },
+                    rotation = rotation,
+                    onScheduleModeChange = activeProgram?.let { program ->
+                        { useRotation -> viewModel.setScheduleMode(program.id, if (useRotation) SCHEDULE_ROTATION else SCHEDULE_WEEKDAYS) }
+                    },
                     modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 12.dp)
                 )
             }
@@ -209,7 +219,29 @@ fun HomeScreen(
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
             }
+            if (activeSession == null) item(key = "log_past") {
+                Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
+                    TextButton(onClick = { showPastWorkout = true }, modifier = Modifier.testTag("log_past_workout")) {
+                        Text("Log a past workout", style = MutantType.ButtonSmall, color = MutantColors.Primary)
+                    }
+                }
+            }
         }
+    }
+
+    if (showPastWorkout) {
+        PastWorkoutSheet(
+            trainingDays = programDays.filterNot { it.isRestDay }.sortedBy { it.dayIndex },
+            defaultDayId = recommendedProgramDay?.id,
+            isStarting = isStarting,
+            onConfirm = { day, startedAt, minutes ->
+                viewModel.startPastWorkout(day, startedAt, minutes) {
+                    showPastWorkout = false
+                    onNavigateToActiveWorkout()
+                }
+            },
+            onDismiss = { showPastWorkout = false }
+        )
     }
 
     if (showAddExerciseDialog) {

@@ -159,7 +159,10 @@ data class WorkoutExport(
 
     val bodyweightKg: Double?,
 
-    val exercises: List<WorkoutExerciseExport>
+    val exercises: List<WorkoutExerciseExport>,
+
+    // Logged after the fact: start and duration were entered by hand and set times are spread over them.
+    val retroactive: Boolean = false
 )
 
 @Serializable
@@ -210,6 +213,9 @@ data class WorkoutSetExport(
 
     val technique: String?,
 
+    // "kg", or "stack_pin" when weightKg is a pin position on a selectorized stack rather than kilograms.
+    val loadUnit: String = "kg",
+
     val segments: List<SetSegmentExport> = emptyList(),
 
     val notes: String? = null
@@ -243,7 +249,17 @@ data class ReadinessExport(
     val jointDiscomfort: Int?,
     val stress: Int?,
 
-    val notes: String?
+    // Computed readiness status ("Normal", "Accumulated fatigue detected").
+    val notes: String?,
+
+    // Every value here comes from the check-in before the workout started, not from the workout itself.
+    val measured: String = "pre_session",
+    // "none", "mild", "moderate" or "severe"; the same as jointDiscomfort 0–3.
+    val jointDiscomfortLevel: String? = null,
+    // Joints the user marked, e.g. ["Elbow"].
+    val jointAreas: List<String> = emptyList(),
+    // The user's own note, e.g. "elbow, since biceps day".
+    val note: String? = null
 )
 
 @Serializable
