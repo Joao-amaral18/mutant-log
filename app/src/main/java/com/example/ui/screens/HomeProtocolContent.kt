@@ -101,7 +101,8 @@ fun formatClock(totalSeconds: Long): String {
     return "%02d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60)
 }
 
-data class ActiveSessionProgress(val title: String, val elapsedSeconds: Long, val doneSets: Int, val totalSets: Int)
+/** [elapsedSeconds] is read lazily so the per-second tick only recomposes [TickingText]. */
+data class ActiveSessionProgress(val title: String, val elapsedSeconds: () -> Long, val doneSets: Int, val totalSets: Int)
 
 @Composable
 fun NextWorkoutCard(
@@ -158,7 +159,7 @@ fun NextWorkoutCard(
             if (activeSession != null) {
                 Column(Modifier.testTag("resume_workout_banner"), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("● IN PROGRESS · ${formatClock(activeSession.elapsedSeconds)}",
+                        TickingText({ "● IN PROGRESS · ${formatClock(activeSession.elapsedSeconds())}" },
                             style = MutantType.MonoLabel.copy(fontSize = 12.sp), color = MutantColors.Primary)
                         Text("${activeSession.doneSets}/${activeSession.totalSets}",
                             style = MutantType.MonoLabel.copy(fontSize = 12.sp), color = MutantColors.TextSecondary)
@@ -328,4 +329,15 @@ fun EmptyProgramCard(
             )
         }
     }
+}
+
+/** Reads a per-second value in its own recompose scope, so a ticking clock does not recompose its parent. */
+@Composable
+internal fun TickingText(
+    text: () -> String,
+    style: androidx.compose.ui.text.TextStyle,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
+) {
+    Text(text(), style = style, color = color, modifier = modifier, maxLines = 1)
 }

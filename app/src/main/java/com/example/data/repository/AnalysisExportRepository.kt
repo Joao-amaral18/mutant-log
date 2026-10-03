@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import com.example.data.db.MUTANT_DB_VERSION
 import com.example.data.db.MutantDao
 import com.example.data.model.*
 import java.text.SimpleDateFormat
@@ -39,7 +40,7 @@ class AnalysisExportRepositoryImpl(
         val appExport = AppExport(
             name = "Mutant Log",
             version = "1.0.0",
-            databaseVersion = 1
+            databaseVersion = MUTANT_DB_VERSION
         )
 
         val profileExport = ProfileExport(
@@ -226,8 +227,32 @@ class AnalysisExportRepositoryImpl(
             )
         }
 
+        // Lossless copy for Import. Finished sessions only: an active session is device-local state.
+        val finished = workouts.filter { it.finishedAt != null }
+        val finishedIds = finished.mapTo(HashSet()) { it.id }
+        val backupExercises = workoutExercises.filter { it.workoutSessionId in finishedIds }
+        val backupExerciseIds = backupExercises.mapTo(HashSet()) { it.id }
+        val backupSets = workoutSets.filter { it.workoutExerciseId in backupExerciseIds }
+        val backupSetIds = backupSets.mapTo(HashSet()) { it.id }
+        val backup = BackupExport(
+            databaseVersion = MUTANT_DB_VERSION,
+            exercises = dao.getEveryExerciseSync(),
+            gyms = dao.getEveryGymSync(),
+            gymEquipment = dao.getAllGymEquipmentSync(),
+            machineCatalog = dao.getUserMachinesSync(),
+            exerciseVariants = dao.getUserExerciseVariantsSync(),
+            programs = dao.getAllProgramsSync(),
+            programDays = programDays,
+            programExercises = programExercises,
+            workoutSessions = finished,
+            workoutExercises = backupExercises,
+            workoutSets = backupSets,
+            setSegments = setSegments.filter { it.workoutSetId in backupSetIds },
+            cardioSessions = cardioList.filter { it.workoutSessionId == null || it.workoutSessionId in finishedIds }
+        )
+
         return AnalysisExport(
-            schemaVersion = 1,
+            schemaVersion = EXPORT_SCHEMA_VERSION,
             generatedAt = nowIso,
             app = appExport,
             profile = profileExport,
@@ -238,7 +263,8 @@ class AnalysisExportRepositoryImpl(
             bodyweight = bodyweightExport,
             cardio = cardioExport,
             readiness = readinessExport,
-            derived = DerivedExport()
+            derived = DerivedExport(),
+            backup = backup
         )
     }
 }

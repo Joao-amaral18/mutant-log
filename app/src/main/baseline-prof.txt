@@ -1,0 +1,6 @@
+# Baseline profile for Mutant Log.
+# Precompiles the app's own code at install time so cold start, the Protocol screen and live
+# session logging do not run interpreted on the Helio G85's little cores. Compose, Room and
+# other AndroidX libraries ship their own profiles, which AGP merges in.
+HSPLcom/example/**->**(**)**
+Lcom/example/**;

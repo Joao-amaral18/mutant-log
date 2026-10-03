@@ -19,6 +19,11 @@ import com.example.data.db.workSetCount
 import com.example.data.model.*
 import com.example.data.repository.AnalysisExportRepository
 import com.example.data.repository.AnalysisExportRepositoryImpl
+import com.example.data.repository.BackupImportRepository
+import com.example.data.repository.ImportException
+import com.example.data.repository.ImportMode
+import com.example.data.repository.ImportPreview
+import com.example.data.repository.ImportResult
 import com.example.data.repository.LibraryCounts
 import com.example.data.repository.MutantRepository
 import com.example.data.repository.ReadinessInput
@@ -33,7 +38,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToStream
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -62,18 +69,35 @@ data class ActiveWorkoutUiState(
     val exercises: List<WorkoutExerciseDetail> = emptyList(),
     val currentExerciseIndex: Int = 0,
     val currentProgression: ProgressionRecommendation? = null,
-    val elapsedSeconds: Long = 0,
-    val restTimerRemainingSeconds: Int = 0,
-    val isRestTimerRunning: Boolean = false,
-    val restTimerCompleted: Boolean = false,
-    val restTimerRecommended: String = "2–3 min",
-    val restTimerTotalSeconds: Int = 0,
     // Work sets from the last finished session of the current exercise.
     val previousWorkSets: List<WorkoutSet> = emptyList(),
     // The same for the exercise after the current one, for the Up next card.
     val nextProgression: ProgressionRecommendation? = null,
     val nextPreviousWorkSets: List<WorkoutSet> = emptyList()
 )
+
+/**
+ * Values that change every second during a session. Kept out of [ActiveWorkoutUiState] so the ticking
+ * only recomposes the leaf composables that show them, not the whole session screen.
+ */
+data class WorkoutClock(
+    val elapsedSeconds: Long = 0,
+    val restRemainingSeconds: Int = 0,
+    val restRunning: Boolean = false,
+    val restCompleted: Boolean = false,
+    val restRecommended: String = "2–3 min",
+    val restTotalSeconds: Int = 0
+)
+
+/** Import flow shown by the settings sheet. */
+sealed interface ImportUiState {
+    data object Idle : ImportUiState
+    data object Reading : ImportUiState
+    data class Preview(val preview: ImportPreview) : ImportUiState
+    data class Running(val mode: ImportMode) : ImportUiState
+    data class Done(val result: ImportResult, val mode: ImportMode, val safetyBackup: File?) : ImportUiState
+    data class Error(val message: String) : ImportUiState
+}
 
 class MutantViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -158,20 +182,27 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private val _workoutClock = MutableStateFlow(WorkoutClock())
+    val workoutClock: StateFlow<WorkoutClock> = _workoutClock.asStateFlow()
+
     private fun refreshClock() {
-        _activeWorkoutUiState.update { state ->
-            val session = state.session ?: return@update state
-            val now = System.currentTimeMillis()
-            val remaining = session.restSecondsAt(now)
-            state.copy(elapsedSeconds = ((now - session.startedAt) / 1000).coerceAtLeast(0),
-                restTimerRemainingSeconds = remaining, isRestTimerRunning = session.restDeadline != null && remaining > 0,
-                restTimerCompleted = session.restCompleted || (session.restDeadline != null && remaining == 0),
-                restTimerRecommended = session.restRecommended,
-                restTimerTotalSeconds = maxOf(session.restTotalSeconds, remaining))
-        }
+        val session = _activeWorkoutUiState.value.session ?: run { _workoutClock.value = WorkoutClock(); return }
+        val now = System.currentTimeMillis()
+        val remaining = session.restSecondsAt(now)
+        _workoutClock.value = WorkoutClock(
+            elapsedSeconds = ((now - session.startedAt) / 1000).coerceAtLeast(0),
+            restRemainingSeconds = remaining,
+            restRunning = session.restDeadline != null && remaining > 0,
+            restCompleted = session.restCompleted || (session.restDeadline != null && remaining == 0),
+            restRecommended = session.restRecommended,
+            restTotalSeconds = maxOf(session.restTotalSeconds, remaining)
+        )
     }
     private var notifiedSessionId: Long? = null
     private var exerciseObserverJob: Job? = null
+    private var observedSessionId: Long? = null
+    private var progressionJob: Job? = null
+    private var progressionKey: List<Any?>? = null
     private val workoutMutationMutex = Mutex()
     private var discardedSessionId: Long? = null
     private val _isDiscardingWorkout = MutableStateFlow(false)
@@ -218,12 +249,23 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     init {
-        // One UI clock for all screens; values always derive from persisted timestamps.
+        // The session clock ticks once a second only while a session is open; values derive from persisted timestamps.
+        viewModelScope.launch {
+            _activeWorkoutUiState.map { it.session?.id }.distinctUntilChanged().collectLatest { id ->
+                refreshClock()
+                if (id == null) return@collectLatest
+                while (true) {
+                    delay(1000 - System.currentTimeMillis() % 1000)
+                    refreshClock()
+                }
+            }
+        }
+        // The Protocol status only needs the date, so it wakes at minute boundaries.
         viewModelScope.launch {
             while (true) {
-                _deviceNowMillis.value = System.currentTimeMillis()
-                refreshClock()
-                delay(1000)
+                val now = System.currentTimeMillis()
+                _deviceNowMillis.value = now
+                delay(60_000 - now % 60_000)
             }
         }
         // Preload canonical reference catalog (124 exercises, 186 machines, 15 muscle groups)
@@ -252,9 +294,11 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
 
         // Monitor active workout session
         viewModelScope.launch {
-            activeWorkoutSession.collect { session ->
+            // Room re-emits on every workout_sessions write; identical rows change nothing.
+            activeWorkoutSession.distinctUntilChanged().collect { session ->
                 if (session == null) {
                     notifiedSessionId = null
+                    observedSessionId = null
                     exerciseObserverJob?.cancel()
                     stopRestTimer()
                     RestTimerAlerts.clearSession(getApplication())
@@ -262,8 +306,9 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     if (session.id == discardedSessionId) return@collect
                     discardedSessionId = null
+                    val before = _activeWorkoutUiState.value
+                    val sameExercise = before.session?.id == session.id && before.currentExerciseIndex == session.currentExerciseIndex
                     _activeWorkoutUiState.update {
-                        val sameExercise = it.session?.id == session.id && it.currentExerciseIndex == session.currentExerciseIndex
                         it.copy(session = session, currentExerciseIndex = session.currentExerciseIndex,
                             isLoading = it.isLoading || it.session?.id != session.id,
                             exercises = if (it.session?.id == session.id) it.exercises else emptyList(),
@@ -278,7 +323,9 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                         androidx.core.content.ContextCompat.startForegroundService(getApplication(),
                             Intent(getApplication(), com.example.ui.components.WorkoutTimerService::class.java))
                     }
-                    observeActiveWorkoutExercises(session.id)
+                    // Rest-timer and index writes do not change the exercise list: keep the one observer.
+                    if (observedSessionId != session.id) observeActiveWorkoutExercises(session.id)
+                    else if (!sameExercise) updateProgressionForCurrentExercise()
                 }
             }
         }
@@ -292,6 +339,7 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun observeActiveWorkoutExercises(sessionId: Long) {
         exerciseObserverJob?.cancel()
+        observedSessionId = sessionId
         exerciseObserverJob = viewModelScope.launch {
             repository.getWorkoutExercisesWithDetails(sessionId).collect { list ->
                 _activeWorkoutUiState.update { current ->
@@ -317,8 +365,15 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         val state = _activeWorkoutUiState.value
         val currentExDetail = state.exercises.getOrNull(state.currentExerciseIndex) ?: return
         val currentEx = currentExDetail.exercise
-
-        viewModelScope.launch {
+        val nextDetail = state.exercises.getOrNull(state.currentExerciseIndex + 1)
+        // Logging a set re-emits the exercise list, but the targets only depend on these inputs.
+        val key = listOf(state.session?.id, state.currentExerciseIndex, currentEx.id, currentExDetail.repMin,
+            currentExDetail.repMax, currentExDetail.plannedRir, nextDetail?.exercise?.id, nextDetail?.repMin,
+            nextDetail?.repMax, nextDetail?.plannedRir)
+        if (key == progressionKey && state.currentProgression != null) return
+        progressionKey = key
+        progressionJob?.cancel()
+        progressionJob = viewModelScope.launch {
             // Double progression reads the last finished session, never the one in progress.
             val recommendation = repository.getProgressionSuggestion(
                 exerciseId = currentEx.id,
@@ -328,7 +383,6 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                 incrementKg = currentEx.defaultIncrementKg
             )
             val previous = repository.getPreviousWorkSets(currentEx.id)
-            val nextDetail = state.exercises.getOrNull(state.currentExerciseIndex + 1)
             val nextRecommendation = nextDetail?.let { next ->
                 repository.getProgressionSuggestion(
                     exerciseId = next.exercise.id,
@@ -500,18 +554,6 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         muscleGroup: String = "Chest"
     ) {
         launchWorkoutMutation {
-            repository.logSet(
-                workoutExerciseId = workoutExerciseId,
-                setType = type,
-                weightKg = weightKg,
-                reps = reps,
-                rir = rir,
-                technique = technique,
-                segments = segments
-            )
-            refreshLibraryCounts()
-
-            // Auto-start rest timer
             val recommendedText = if (muscleGroup.equals("Quads", ignoreCase = true) ||
                 muscleGroup.equals("Hamstrings", ignoreCase = true) ||
                 muscleGroup.equals("Legs", ignoreCase = true)
@@ -520,7 +562,18 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
             } else {
                 "Recommended: 2–3 min"
             }
-            startRestTimer(defaultRestSeconds, recommendedText)
+            // Set, segments and the auto-started rest timer land in one commit (one fsync on eMMC).
+            repository.logSet(
+                workoutExerciseId = workoutExerciseId,
+                setType = type,
+                weightKg = weightKg,
+                reps = reps,
+                rir = rir,
+                technique = technique,
+                segments = segments,
+                restSeconds = defaultRestSeconds,
+                restRecommended = recommendedText
+            )
         }
     }
 
@@ -679,7 +732,7 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         launchWorkoutMutation { dao.updateNextSet(exerciseId, weight, reps) }
     }
     private fun stopRestTimer() {
-        _activeWorkoutUiState.update { it.copy(restTimerRemainingSeconds = 0, isRestTimerRunning = false, restTimerCompleted = false) }
+        _workoutClock.update { it.copy(restRemainingSeconds = 0, restRunning = false, restCompleted = false) }
 
     }
 
@@ -775,6 +828,7 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
     fun exportFileName(): String = "mutant-log-analysis-${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())}.json"
 
     fun shareExportFile(context: Context, onError: (String) -> Unit = {}, onComplete: (() -> Unit)? = null) {
+        if (_importState.value is ImportUiState.Running) return
         viewModelScope.launch(Dispatchers.IO) {
             isExporting.value = true
             try {
@@ -811,5 +865,90 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                 isExporting.value = false
             }
         }
+    }
+
+    // --- IMPORT / RESTORE ---
+    private val importRepository = BackupImportRepository(database)
+    private val _importState = MutableStateFlow<ImportUiState>(ImportUiState.Idle)
+    val importState: StateFlow<ImportUiState> = _importState.asStateFlow()
+
+    /** Parses the picked file off the main thread and shows what it contains. */
+    fun previewImport(uri: Uri) {
+        if (isExporting.value || _importState.value is ImportUiState.Running) return
+        _importState.value = ImportUiState.Reading
+        viewModelScope.launch(Dispatchers.IO) {
+            _importState.value = try {
+                val resolver = getApplication<Application>().contentResolver
+                val size = resolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                    if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null
+                }
+                val stream = resolver.openInputStream(uri) ?: throw ImportException("Could not open that file.")
+                ImportUiState.Preview(stream.use { importRepository.readPreview(it, size) })
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ImportException) {
+                ImportUiState.Error(e.message ?: "Import failed.")
+            } catch (e: Exception) {
+                ImportUiState.Error("Could not read that file.")
+            }
+        }
+    }
+
+    fun confirmImport(mode: ImportMode) {
+        val preview = (_importState.value as? ImportUiState.Preview)?.preview ?: return
+        _importState.value = ImportUiState.Running(mode)
+        viewModelScope.launch(Dispatchers.IO) {
+            _importState.value = try {
+                // Serialized with workout mutations; the repository also refuses while a session is active.
+                workoutMutationMutex.withLock {
+                    val safety = if (mode == ImportMode.REPLACE) writeSafetyBackup() else null
+                    val result = importRepository.apply(preview, mode)
+                    val previous = _selectedGym.value
+                    val gyms = dao.getEveryGymSync().filter { !it.isArchived }
+                    _selectedGym.value = gyms.firstOrNull { it.name == previous?.name } ?: gyms.firstOrNull()
+                    ImportUiState.Done(result, mode, safety)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ImportException) {
+                ImportUiState.Error(e.message ?: "Import failed.")
+            } catch (e: Exception) {
+                ImportUiState.Error("Import failed. Nothing was changed.")
+            }
+            refreshLibraryCounts()
+        }
+    }
+
+    fun dismissImport() {
+        if (_importState.value !is ImportUiState.Running) _importState.value = ImportUiState.Idle
+    }
+
+    /** Full export written before a Replace, so the previous data can still be recovered. Keeps the newest 3. */
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun writeSafetyBackup(): File {
+        val dir = File(getApplication<Application>().filesDir, "backups").apply { mkdirs() }
+        val stamp = SimpleDateFormat("yyyy-MM-dd-HHmmss", Locale.US).format(Date())
+        val file = File(dir, "mutant-log-before-import-$stamp.json")
+        val export = exportRepository.buildExport()
+        file.outputStream().buffered().use { jsonSerializer.encodeToStream(AnalysisExport.serializer(), export, it) }
+        dir.listFiles { f -> f.name.startsWith("mutant-log-before-import-") }
+            ?.sortedByDescending { it.name }?.drop(SAFETY_BACKUPS_KEPT)?.forEach { it.delete() }
+        return file
+    }
+
+    fun shareSafetyBackup(context: Context, file: File) {
+        val app = getApplication<Application>()
+        val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", file)
+        val share = Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Mutant Log safety backup — ${file.name}")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(share, "Save safety backup"))
+    }
+
+    private companion object {
+        const val SAFETY_BACKUPS_KEPT = 3
     }
 }

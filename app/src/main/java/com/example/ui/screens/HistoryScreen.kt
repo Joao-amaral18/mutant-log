@@ -67,7 +67,11 @@ internal fun HistoryContent(
     var sessionId by rememberSaveable { mutableStateOf<Long?>(null) }
     var exerciseId by rememberSaveable { mutableStateOf<Long?>(null) }
     val selectedSession = state.workouts.firstOrNull { it.session.id == sessionId }
-    val summaries = remember(state.workouts) { WorkoutHistory.exercises(state.workouts) }
+    // Exercise summaries are the heaviest History derivation; build them only once that tab is used.
+    val needSummaries = mode == 1 || exerciseId != null
+    val summaries = remember(state.workouts, needSummaries) {
+        if (needSummaries) WorkoutHistory.exercises(state.workouts) else emptyList()
+    }
     val selectedExercise = summaries.firstOrNull { it.exercise.id == exerciseId }
     BackHandler(sessionId != null || exerciseId != null) {
         if (sessionId != null) sessionId = null else exerciseId = null
@@ -178,24 +182,36 @@ private fun HistoryTimeline(workouts: List<HistoryWorkout>, onOpen: (Long) -> Un
     val selectedTypes = types.filter { it in recordedTitles }.toSet()
     val filtered = remember(workouts, query, types, days, prs) { WorkoutHistory.filter(workouts, query, selectedTypes, days.takeIf { it > 0 }, prs) }
     var monthOffset by rememberSaveable { mutableIntStateOf(0) }
-    val month = historyMonth(monthOffset)
-    val periodWorkouts = filtered.filter { historyDate(it.session.startedAt, "yyyy-MM") == historyDate(month.timeInMillis, "yyyy-MM") }
+    val month = remember(monthOffset) { historyMonth(monthOffset) }
+    val monthKey = remember(month) { historyDate(month.timeInMillis, "yyyy-MM") }
     val searching = query.isNotBlank() || selectedTypes.isNotEmpty() || days > 0 || prs
-    val visible = if (searching) filtered else periodWorkouts
-    val now = Calendar.getInstance()
-    val weekStart = (now.clone() as Calendar).apply {
-        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        add(Calendar.DAY_OF_YEAR, -((get(Calendar.DAY_OF_WEEK) + 5) % 7))
-    }.timeInMillis
-    val groups = visible.groupBy { workout ->
-        val date = historyDate(workout.session.startedAt, "yyyy-MM-dd")
-        when {
-            date == historyDate(now.timeInMillis, "yyyy-MM-dd") -> "TODAY"
-            date == historyDate((now.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }.timeInMillis, "yyyy-MM-dd") -> "YESTERDAY"
-            workout.session.startedAt >= weekStart && workout.session.startedAt <= now.timeInMillis -> "THIS WEEK"
-            else -> historyDate(workout.session.startedAt, "MMMM yyyy").uppercase(historyLocale)
+    // Everything below is derived once per input change, not on every recomposition of the timeline.
+    val visible = remember(filtered, monthKey, searching) {
+        if (searching) filtered else filtered.filter { historyDate(it.session.startedAt, "yyyy-MM") == monthKey }
+    }
+    val totals = remember(visible) {
+        listOf("WORKOUTS" to visible.size.toString(), "TIME" to historyDuration(visible.sumOf { it.minutes }),
+            "SETS" to visible.sumOf { it.sets.size }.toString(), "VOLUME" to "${historyNumber(visible.sumOf { it.volume })} kg")
+    }
+    val groups = remember(visible) {
+        val now = Calendar.getInstance()
+        val today = historyDate(now.timeInMillis, "yyyy-MM-dd")
+        val yesterday = historyDate((now.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }.timeInMillis, "yyyy-MM-dd")
+        val weekStart = (now.clone() as Calendar).apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            add(Calendar.DAY_OF_YEAR, -((get(Calendar.DAY_OF_WEEK) + 5) % 7))
+        }.timeInMillis
+        visible.groupBy { workout ->
+            val date = historyDate(workout.session.startedAt, "yyyy-MM-dd")
+            when {
+                date == today -> "TODAY"
+                date == yesterday -> "YESTERDAY"
+                workout.session.startedAt >= weekStart && workout.session.startedAt <= now.timeInMillis -> "THIS WEEK"
+                else -> historyDate(workout.session.startedAt, "MMMM yyyy").uppercase(historyLocale)
+            }
         }
     }
+    val hasOlder = remember(workouts, monthKey) { workouts.any { historyDate(it.session.startedAt, "yyyy-MM") < monthKey } }
     LazyColumn(Modifier.fillMaxSize().testTag("history_timeline"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { HistorySearch(query, { query = it }, "Search workouts", "history_search") }
         item {
@@ -212,7 +228,7 @@ private fun HistoryTimeline(workouts: List<HistoryWorkout>, onOpen: (Long) -> Un
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (searching) MutantEyebrow("SEARCH RESULTS", style = MutantType.Eyebrow.copy(fontSize = 10.5.sp, letterSpacing = 0.1.em))
                 else HistoryMonthSelector(month, { monthOffset-- }, { monthOffset++ }, monthOffset < 0)
-                HistoryMetrics(listOf("WORKOUTS" to visible.size.toString(), "TIME" to historyDuration(visible.sumOf { it.minutes }), "SETS" to visible.sumOf { it.sets.size }.toString(), "VOLUME" to "${historyNumber(visible.sumOf { it.volume })} kg"))
+                HistoryMetrics(totals)
             }
         }
         if (visible.isEmpty()) item { HistoryEmpty(if (workouts.isEmpty()) "Your history starts with your next workout." else if (searching) "No workouts match these filters." else "No workouts this month.", if (workouts.isEmpty()) "Finish a session to track your progress here." else if (searching) "Change the search or filters to see other workouts." else "Go back a month to find earlier sessions.") }
@@ -220,7 +236,7 @@ private fun HistoryTimeline(workouts: List<HistoryWorkout>, onOpen: (Long) -> Un
             item(key = "group-$label") { MutantEyebrow(label, modifier = Modifier.padding(start = 4.dp, top = 10.dp), style = MutantType.Eyebrow.copy(fontSize = 10.5.sp, letterSpacing = 0.1.em)) }
             items(sessions, key = { it.session.id }) { HistorySessionCard(it) { onOpen(it.session.id) } }
         }
-        if (!searching && workouts.any { historyDate(it.session.startedAt, "yyyy-MM") < historyDate(month.timeInMillis, "yyyy-MM") }) item {
+        if (!searching && hasOlder) item {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 TextButton(onClick = { monthOffset-- }, contentPadding = PaddingValues(horizontal = 12.dp),
                     modifier = Modifier.height(44.dp).testTag("history_older")) {
@@ -353,8 +369,17 @@ internal fun HistoryEmpty(title: String, description: String) {
 }
 
 internal val historyLocale: Locale = Locale.US
-internal fun historyDate(timestamp: Long, pattern: String): String = SimpleDateFormat(pattern, historyLocale).format(Date(timestamp))
-internal fun historyNumber(value: Number): String = NumberFormat.getNumberInstance(historyLocale).apply { maximumFractionDigits = 1 }.format(value)
+// Formatters are costly to build and History formats several dates per row, so each thread keeps one per pattern.
+private val historyFormats = object : ThreadLocal<HashMap<String, SimpleDateFormat>>() {
+    override fun initialValue() = HashMap<String, SimpleDateFormat>()
+}
+private val historyNumberFormat = object : ThreadLocal<NumberFormat>() {
+    override fun initialValue(): NumberFormat = NumberFormat.getNumberInstance(historyLocale).apply { maximumFractionDigits = 1 }
+}
+internal fun historyDate(timestamp: Long, pattern: String): String =
+    historyFormats.get()!!.getOrPut(pattern) { SimpleDateFormat(pattern, historyLocale) }
+        .apply { timeZone = TimeZone.getDefault() }.format(Date(timestamp))
+internal fun historyNumber(value: Number): String = historyNumberFormat.get()!!.format(value)
 internal fun historySetText(set: WorkoutSet): String = "${historyNumber(set.weightKg)} × ${set.reps}"
 internal fun historyDuration(minutes: Int): String = if (minutes < 60) "${minutes}min" else "${minutes / 60}h ${"%02d".format(minutes % 60)}min"
 internal fun historyMonth(offset: Int): Calendar = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1); add(Calendar.MONTH, offset) }

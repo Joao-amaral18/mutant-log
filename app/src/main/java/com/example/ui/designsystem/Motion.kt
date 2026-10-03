@@ -59,6 +59,8 @@ object MutantMotion {
         enterSlide togetherWith exitSlide
     }
 
+    // Only the incoming screen fades. Cross-fading both full screens rendered two offscreen layers per frame,
+    // which the Mali-G52 on low-end phones could not draw inside a 90 Hz frame.
     val ScreenFadeThroughSpec = fadeIn(animationSpec = tween(Navigation, easing = LinearOutSlowInEasing)) togetherWith
-            fadeOut(animationSpec = tween(120, easing = FastOutLinearInEasing))
+            fadeOut(animationSpec = snap())
 }

@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
         when (action) {
             RestTimerAlerts.ACTION_ADD_TIME -> {
                 val seconds = intent.getIntExtra(RestTimerAlerts.TIMER_SECONDS_EXTRA, 30)
-                if (viewModel.activeWorkoutUiState.value.restTimerRemainingSeconds <= 0) {
+                if (viewModel.workoutClock.value.restRemainingSeconds <= 0) {
                     viewModel.startRestTimer(seconds)
                 } else {
                     viewModel.adjustRestTimer(seconds)
@@ -117,7 +117,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableSharedFlow<Unit>) {
     val draft by viewModel.workoutDraft.collectAsState()
-    var currentScreen by remember { mutableStateOf(NavDestination.HOME) }
+    var currentScreen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(NavDestination.HOME) }
+    // Keeps each tab's saveable state (filters, scroll position) while another tab is shown.
+    val screenStates = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val activeSession by viewModel.activeWorkoutSession.collectAsState(initial = null)
 
     LaunchedEffect(workoutNavigationRequests) {
@@ -158,6 +160,7 @@ fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableShar
                 transitionSpec = { MutantMotion.ScreenFadeThroughSpec },
                 label = "ScreenFadeThrough"
             ) { destination ->
+                screenStates.SaveableStateProvider(destination.name) {
                 when (destination) {
                     NavDestination.HOME -> HomeScreen(
                         viewModel = viewModel,
@@ -177,6 +180,7 @@ fun MutantApp(viewModel: MutantViewModel, workoutNavigationRequests: MutableShar
                         viewModel = viewModel,
                         onNavigateBack = { currentScreen = NavDestination.HOME }
                     )
+                }
                 }
             }
         }

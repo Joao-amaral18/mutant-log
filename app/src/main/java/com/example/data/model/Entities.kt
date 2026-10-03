@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 // --- 1. REFERENCE DATA: Muscle Groups ---
 @Entity(tableName = "muscle_groups")
@@ -16,6 +17,7 @@ data class MuscleGroup(
 
 // --- 2. REFERENCE DATA: Machine Catalog ---
 @Entity(tableName = "machine_catalog")
+@Serializable
 data class MachineCatalogEntity(
     @PrimaryKey val id: String, // e.g. "machine_panatta_super_incline_bench"
     val manufacturer: String?, // "Panatta", "Hammer Strength", "Prime", "Arsenal", etc.
@@ -30,6 +32,7 @@ data class MachineCatalogEntity(
 
 // --- 3. REFERENCE DATA: Exercise Canonical Library ---
 @Entity(tableName = "exercises")
+@Serializable
 data class Exercise(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val stableId: String = "", // e.g. "exercise_incline_chest_press"
@@ -58,6 +61,7 @@ data class Exercise(
     tableName = "exercise_variants",
     indices = [Index("exerciseId"), Index("machineCatalogId")]
 )
+@Serializable
 data class ExerciseVariant(
     @PrimaryKey val id: String, // e.g. "var_incline_panatta"
     val exerciseId: Long,
@@ -77,6 +81,7 @@ data class ExerciseVariant(
 
 // --- 5. REFERENCE / USER DATA: Gyms ---
 @Entity(tableName = "gyms")
+@Serializable
 data class Gym(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
@@ -104,6 +109,7 @@ data class Gym(
     ],
     indices = [Index("gymId"), Index("machineCatalogId")]
 )
+@Serializable
 data class GymEquipmentEntity(
     @PrimaryKey val id: String,
     val gymId: Long,
@@ -115,6 +121,7 @@ data class GymEquipmentEntity(
 
 // --- 7. USER DATA: Programs ---
 @Entity(tableName = "programs")
+@Serializable
 data class Program(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
@@ -129,6 +136,7 @@ data class Program(
 )
 
 @Entity(tableName = "program_days")
+@Serializable
 data class ProgramDay(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val programId: Long = 0,
@@ -157,6 +165,7 @@ data class ProgramDay(
     ],
     indices = [Index("programDayId"), Index("exerciseId")]
 )
+@Serializable
 data class ProgramExercise(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val programDayId: Long,
@@ -175,6 +184,7 @@ data class ProgramExercise(
     tableName = "workout_sessions",
     indices = [Index("programDayId"), Index("gymId")]
 )
+@Serializable
 data class WorkoutSession(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val programDayId: Long? = null,
@@ -222,6 +232,7 @@ data class WorkoutSession(
     ],
     indices = [Index("workoutSessionId"), Index("exerciseId")]
 )
+@Serializable
 data class WorkoutExercise(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val workoutSessionId: Long,
@@ -268,6 +279,7 @@ enum class IntensityTechnique {
     ],
     indices = [Index("workoutExerciseId")]
 )
+@Serializable
 data class WorkoutSet(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val workoutExerciseId: Long,
@@ -294,6 +306,7 @@ data class WorkoutSet(
     ],
     indices = [Index("workoutSetId")]
 )
+@Serializable
 data class SetSegment(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val workoutSetId: Long,
@@ -305,6 +318,7 @@ data class SetSegment(
 )
 
 @Entity(tableName = "cardio_sessions")
+@Serializable
 data class CardioSession(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val workoutSessionId: Long? = null,

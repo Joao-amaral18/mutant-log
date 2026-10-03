@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.db.sessionSets
 import com.example.ui.designsystem.MutantStrokeWidths
 
@@ -67,6 +68,8 @@ fun HomeScreen(
     val allGyms by viewModel.allGyms.collectAsState(initial = emptyList())
     val activeSession by viewModel.activeWorkoutSession.collectAsState(initial = null)
     val activeUiState by viewModel.activeWorkoutUiState.collectAsState()
+    // Read only inside the in-progress label, so the per-second tick stays out of the screen scope.
+    val clock = viewModel.workoutClock.collectAsStateWithLifecycle()
     val libraryCounts by viewModel.libraryCounts.collectAsState()
     val allExercises by viewModel.allExercises.collectAsState(initial = emptyList())
     val allVariants by viewModel.allVariants.collectAsState(initial = emptyList())
@@ -177,7 +180,7 @@ fun HomeScreen(
                     recoveryText = systemStatus.recoveryDaysText,
                     readinessScore = systemStatus.lastReadinessScore,
                     activeSession = activeSession?.let {
-                        ActiveSessionProgress(it.title, activeUiState.elapsedSeconds, doneSets, totalSets)
+                        ActiveSessionProgress(it.title, { clock.value.elapsedSeconds }, doneSets, totalSets)
                     },
                     isStarting = isStarting,
                     startError = startError,

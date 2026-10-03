@@ -6,10 +6,9 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,7 +21,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -89,10 +87,9 @@ fun RestTimerBar(
     val done = isComplete && remainingSeconds <= 0
     val paused = !isRunning && remainingSeconds > 0
     val accent = if (done) MutantColors.Success else MutantColors.Primary
-    val fraction by animateFloatAsState(
-        if (done) 0f else remainingSeconds / longest.coerceAtLeast(1).toFloat(),
-        tween(1000), label = "RestFraction"
-    )
+    // Steps once a second with the countdown text. A continuous tween here recomposed the bar on every frame
+    // and kept the 90 Hz panel from idling for the whole rest.
+    val fraction = if (done) 0f else remainingSeconds / longest.coerceAtLeast(1).toFloat()
 
     AnimatedVisibility(
         visible = visible,
@@ -103,8 +100,9 @@ fun RestTimerBar(
         Column(
             Modifier
                 .fillMaxWidth()
-                .shadow(24.dp, RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp), ambientColor = androidx.compose.ui.graphics.Color.Black)
+                // A hairline instead of a 24 dp shadow: the shadow layer was re-rendered on every redraw of the bar.
                 .background(MutantColors.SurfaceContainerHigh, RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
+                .border(1.dp, MutantColors.Outline, RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
                 .navigationBarsPadding()
                 .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 16.dp)
                 .testTag("rest_timer_bar"),

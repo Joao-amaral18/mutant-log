@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
@@ -17,6 +18,8 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 internal fun HistorySessionDetail(workout: HistoryWorkout, all: List<HistoryWorkout>, onBack: () -> Unit, onEdit: (Long) -> Unit, editError: String?, editing: Boolean) {
+    // Sorted once for every row's "previous" lookup instead of once per exercise.
+    val ordered = remember(all) { WorkoutHistory.filter(all) }
     Column(Modifier.fillMaxSize().testTag("history_session_detail")) {
         HistoryHeader(workout.session.title, onBack) {
             TextButton(onClick = { onEdit(workout.session.id) }, enabled = !editing, modifier = Modifier.testTag("history_edit")) {
@@ -32,7 +35,9 @@ internal fun HistorySessionDetail(workout: HistoryWorkout, all: List<HistoryWork
                 editError?.let { Text(it, color = MutantColors.Error) }
             }
             items(workout.exercises, key = { it.workoutExercise.id }) { ex ->
-                val previous = WorkoutHistory.previousExercise(all, workout, ex.exercise.id)
+                val previous = remember(ordered, workout, ex.exercise.id) {
+                    WorkoutHistory.previousExercise(ordered, workout, ex.exercise.id, sorted = true)
+                }
                 MutantCard {
                     Text(ex.exercise.name, style = MutantType.Title, color = MutantColors.TextPrimary)
                     if (ex.workoutExercise.notes.isNotBlank()) Text(ex.workoutExercise.notes, color = MutantColors.TextSecondary, modifier = Modifier.padding(top = MutantSpacing.xs))
@@ -73,7 +78,7 @@ internal fun HistorySessionDetail(workout: HistoryWorkout, all: List<HistoryWork
                 Text("Work totals include drop-set and rest-pause segments. Warm-ups are excluded.", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
             }
             item {
-                val previous = WorkoutHistory.previous(all, workout)
+                val previous = remember(ordered, workout) { WorkoutHistory.previous(ordered, workout, sorted = true) }
                 if (previous != null) {
                     MutantCard {
                         MutantEyebrow("VS. LAST ${previous.session.title.uppercase(historyLocale)}", color = MutantColors.Primary)

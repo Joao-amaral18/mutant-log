@@ -135,6 +135,8 @@ fun ActiveWorkoutContent(
     onRemovePlannedSet: () -> Unit = {},
     onAddSet: () -> Unit = {},
     onOpenList: () -> Unit = {},
+    // Read lazily in the header label so the per-second tick does not recompose the session screen.
+    elapsedSeconds: () -> Long = { 0L },
     setupEditor: @Composable () -> Unit = {},
     restTimer: @Composable () -> Unit = {}
 ) {
@@ -174,7 +176,7 @@ fun ActiveWorkoutContent(
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(session.title, style = MutantType.Title.copy(lineHeight = 20.sp), color = MutantColors.TextPrimary,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${formatClock(state.elapsedSeconds)} · $doneSets/$totalSets sets",
+                        TickingText({ "${formatClock(elapsedSeconds())} · $doneSets/$totalSets sets" },
                             style = MutantType.MonoLabel, color = MutantColors.TextSecondary)
                     }
                     Surface(

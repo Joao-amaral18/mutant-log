@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.db.sessionSets
 import com.example.data.db.repMin
 import com.example.data.db.repMax
@@ -35,7 +36,9 @@ fun ActiveWorkoutScreen(
     modifier: Modifier = Modifier,
     onNavigateToHistory: () -> Unit = {}
 ) {
-    val state by viewModel.activeWorkoutUiState.collectAsState()
+    val state by viewModel.activeWorkoutUiState.collectAsStateWithLifecycle()
+    // Not delegated: the value is read inside the clock label and rest bar only, so ticking stays local.
+    val clock = viewModel.workoutClock.collectAsStateWithLifecycle()
     val isDiscarding by viewModel.isDiscardingWorkout.collectAsState()
     val isFinishing by viewModel.isFinishingWorkout.collectAsState()
     val discardError by viewModel.discardError.collectAsState()
@@ -151,9 +154,11 @@ fun ActiveWorkoutScreen(
         if (progression == null && workoutExercise.nextSetWeightKg == null) return@LaunchedEffect
         val weight = weightInput.toFloatOrNull()
         val reps = repsInput.toIntOrNull()
-        if (weight != null && weight.isFinite() && weight >= 0f && reps != null && reps > 0) {
-            viewModel.updateNextSet(workoutExercise.id, weight, reps)
-        }
+        if (weight == null || !weight.isFinite() || weight < 0f || reps == null || reps <= 0) return@LaunchedEffect
+        // Every write re-emits the session; skip unchanged values and let typing or stepper taps settle first.
+        if (weight == workoutExercise.nextSetWeightKg && reps == workoutExercise.nextSetReps) return@LaunchedEffect
+        kotlinx.coroutines.delay(NextSetSaveDelayMs)
+        viewModel.updateNextSet(workoutExercise.id, weight, reps)
     }
     var selectedRir by remember(workoutExercise.id) { mutableIntStateOf(currentExDetail.plannedRir) }
     var selectedTechnique by remember(workoutExercise.id) { mutableStateOf(IntensityTechnique.NONE) }
@@ -215,7 +220,7 @@ fun ActiveWorkoutScreen(
         }.toFloat()
         FinishSessionSheet(
             title = session.title,
-            elapsedMinutes = state.elapsedSeconds / 60,
+            elapsedMinutes = viewModel.workoutClock.value.elapsedSeconds / 60,
             doneSets = loggedSets,
             totalSets = state.exercises.sumOf { it.sessionSets },
             volumeKg = volume,
@@ -247,11 +252,12 @@ fun ActiveWorkoutScreen(
     }
 
     val restTimer: @Composable () -> Unit = {
+            val rest = clock.value
             RestTimerBar(
-                remainingSeconds = state.restTimerRemainingSeconds,
-                isRunning = state.isRestTimerRunning,
-                isComplete = state.restTimerCompleted,
-                plannedSeconds = state.restTimerTotalSeconds.takeIf { it > 0 } ?: currentExDetail.plannedRestSeconds,
+                remainingSeconds = rest.restRemainingSeconds,
+                isRunning = rest.restRunning,
+                isComplete = rest.restCompleted,
+                plannedSeconds = rest.restTotalSeconds.takeIf { it > 0 } ?: currentExDetail.plannedRestSeconds,
                 executionQuality = workoutExercise.executionQuality,
                 targetMuscleQuality = workoutExercise.targetMuscleQuality,
                 onExecutionQuality = { saveQuality(it, workoutExercise.targetMuscleQuality) },
@@ -363,6 +369,7 @@ fun ActiveWorkoutScreen(
         },
         onAddSet = { viewModel.addPlannedSet(workoutExercise.id) { toast.show(it) } },
         onOpenList = { listOpen = true },
+        elapsedSeconds = { clock.value.elapsedSeconds },
         onLogSet = {
             val weight = weightInput.toFloatOrNull()
             val reps = repsInput.toIntOrNull()
@@ -422,3 +429,5 @@ fun ActiveWorkoutScreen(
         restTimer = restTimer
     )
 }
+
+private const val NextSetSaveDelayMs = 400L

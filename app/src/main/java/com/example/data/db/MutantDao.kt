@@ -206,6 +206,15 @@ interface MutantDao {
     suspend fun updateNextSet(id: Long, weight: Float, reps: Int)
     @Query("UPDATE workout_sessions SET restDeadline = NULL, restRemainingSeconds = 0, restCompleted = 1 WHERE id = :id AND finishedAt IS NULL AND restDeadline = :deadline AND restDeadline <= :now")
     suspend fun completeRestIfDue(id: Long, deadline: Long, now: Long): Int
+    /** One commit per logged set: the set, its segments and, when given, the rest timer that follows it. */
+    @Transaction
+    suspend fun logSet(set: WorkoutSet, segments: List<SetSegment>, restSeconds: Int?, restRecommended: String?): Long {
+        val id = insertWorkoutSet(set.copy(setNumber = getSetsForWorkoutExerciseSync(set.workoutExerciseId).size + 1))
+        if (segments.isNotEmpty()) insertSetSegments(segments.map { it.copy(id = 0, workoutSetId = id) })
+        if (restSeconds != null) changeRestTimer("start", restSeconds, restRecommended)
+        return id
+    }
+
     @Transaction
     suspend fun changeRestTimer(action: String, seconds: Int = 0, recommended: String? = null) {
         val session = getActiveSessionSync() ?: return
@@ -587,4 +596,80 @@ interface MutantDao {
 
     @Query("SELECT * FROM cardio_sessions ORDER BY timestamp ASC")
     suspend fun getAllCardioSessionsSync(): List<CardioSession>
+
+    // --- Backup / restore ---
+    // Archived rows are included: finished workouts may still point at them.
+    @Query("SELECT * FROM exercises ORDER BY id ASC")
+    suspend fun getEveryExerciseSync(): List<Exercise>
+
+    @Query("SELECT * FROM gyms ORDER BY id ASC")
+    suspend fun getEveryGymSync(): List<Gym>
+
+    @Query("SELECT * FROM gym_equipment")
+    suspend fun getAllGymEquipmentSync(): List<GymEquipmentEntity>
+
+    @Query("SELECT * FROM programs ORDER BY id ASC")
+    suspend fun getAllProgramsSync(): List<Program>
+
+    @Query("SELECT * FROM exercise_variants WHERE source = 'user'")
+    suspend fun getUserExerciseVariantsSync(): List<ExerciseVariant>
+
+    @Query("SELECT * FROM machine_catalog WHERE source = 'user'")
+    suspend fun getUserMachinesSync(): List<MachineCatalogEntity>
+
+    @Query("SELECT id FROM exercise_variants")
+    suspend fun getExerciseVariantIdsSync(): List<String>
+
+    @Query("SELECT id FROM machine_catalog")
+    suspend fun getMachineIdsSync(): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWorkoutSets(sets: List<WorkoutSet>): List<Long>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSetSegments(segments: List<SetSegment>)
+
+    @Update
+    suspend fun updateProgram(program: Program)
+
+    @Query("DELETE FROM cardio_sessions")
+    suspend fun deleteAllCardio()
+
+    @Query("DELETE FROM workout_sessions")
+    suspend fun deleteAllWorkoutSessions()
+
+    @Query("DELETE FROM program_days")
+    suspend fun deleteAllProgramDays()
+
+    @Query("DELETE FROM programs")
+    suspend fun deleteAllPrograms()
+
+    @Query("DELETE FROM gyms")
+    suspend fun deleteAllGyms()
+
+    @Query("DELETE FROM exercise_variants WHERE source = 'user'")
+    suspend fun deleteUserExerciseVariants()
+
+    @Query("DELETE FROM machine_catalog WHERE source = 'user'")
+    suspend fun deleteUserMachines()
+
+    @Query("DELETE FROM exercises WHERE source = 'user'")
+    suspend fun deleteUserExercises()
+
+    /**
+     * Removes everything the user owns before a Replace import. Cascades take workout exercises, sets, segments,
+     * program exercises and gym equipment; tables without a foreign key are cleared explicitly.
+     * The bundled catalog stays, so bundled exercise ids remain valid.
+     */
+    @Transaction
+    suspend fun clearUserData() {
+        deleteAllCardio()
+        deleteAllWorkoutSessions()
+        deleteAllProgramDays()
+        deleteAllPrograms()
+        deleteAllGyms()
+        deleteUserExerciseVariants()
+        deleteUserMachines()
+        deleteUserExercises()
+    }
 }
