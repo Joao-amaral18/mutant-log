@@ -33,6 +33,7 @@ internal object RestTimerAlerts {
     internal const val RUNNING_CHANNEL_ID = "rest_timer_running_v2"
     private const val LEGACY_RUNNING_CHANNEL_ID = "rest_timer_running"
     private const val ALARM_NOTIFICATION_ID = 4101
+    private const val ALARM_TIMEOUT_MS = 15_000L
     internal const val RUNNING_NOTIFICATION_ID = 4100
     private var completionListener: android.app.AlarmManager.OnAlarmListener? = null
 
@@ -91,6 +92,11 @@ internal object RestTimerAlerts {
             .commit()
         cancelCompletion(context)
         cancelRunning(context)
+        cancelRestComplete(context)
+    }
+
+    /** Stops the rest-complete alarm sound by removing its notification. */
+    fun cancelRestComplete(context: Context) {
         NotificationManagerCompat.from(context).cancel(ALARM_NOTIFICATION_ID)
     }
 
@@ -134,6 +140,8 @@ internal object RestTimerAlerts {
             .setContentIntent(activityIntent(context, ALARM_NOTIFICATION_ID))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
+            // Alarm tones can run for minutes; the alert only needs to get attention, so it times out.
+            .setTimeoutAfter(ALARM_TIMEOUT_MS)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
