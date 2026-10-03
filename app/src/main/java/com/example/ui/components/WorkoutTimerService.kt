@@ -44,6 +44,9 @@ class WorkoutTimerService : Service() {
             dao.getActiveWorkoutSession().distinctUntilChanged().collectLatest { session ->
                 ticker?.cancel()
                 cancelCompletion()
+                // The "Rest complete" alarm keeps playing until its notification goes away, so silence it as soon
+                // as the rest is no longer in its completed state: skipped, restarted, adjusted or session ended.
+                if (session == null || !session.restCompleted) RestTimerAlerts.cancelRestComplete(this@WorkoutTimerService)
                 if (session == null) {
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
@@ -112,7 +115,9 @@ class WorkoutTimerService : Service() {
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(notificationViews(session, current, false))
             .setCustomBigContentView(notificationViews(session, current, true))
-            .setColor(0xFFAB78FF.toInt())
+            // A colorized foreground-service notification gets one solid card, header included: the closest an app
+            // can get to a media player's custom background without being a media session.
+            .setColor(0xFF17121F.toInt()).setColorized(true)
             .setSubText("Workout active")
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(activityIntent()).setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -120,7 +125,7 @@ class WorkoutTimerService : Service() {
             .setWhen(if (running) session.restDeadline!! else session.startedAt)
             .setUsesChronometer(running).setChronometerCountDown(running).setShowWhen(running)
             .setProgress(if (remaining > 0) session.restRemainingSeconds.coerceAtLeast(remaining) else 0, remaining, false)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
         return builder.build()
     }
     private fun notificationViews(session: WorkoutSession, current: WorkoutExerciseDetail?, expanded: Boolean): RemoteViews {
@@ -175,7 +180,7 @@ class WorkoutTimerService : Service() {
     private fun serviceAction(action: String, code: Int, seconds: Int = 0): PendingIntent = PendingIntent.getService(this, code,
         Intent(this, WorkoutTimerService::class.java).setAction(action).putExtra(EXTRA_SECONDS, seconds), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     private fun cancelCompletion() { completionListener?.let { getSystemService(AlarmManager::class.java).cancel(it) }; completionListener = null }
-    override fun onDestroy() { cancelCompletion(); scope.cancel(); super.onDestroy() }
+    override fun onDestroy() { cancelCompletion(); RestTimerAlerts.cancelRestComplete(this); scope.cancel(); super.onDestroy() }
     companion object {
         private const val PROGRESS_REFRESH_MS = 5_000L
         const val OPEN_FINISH_EXTRA = "open_finish_workout_confirmation"

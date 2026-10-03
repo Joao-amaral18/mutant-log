@@ -29,8 +29,11 @@ internal object RestTimerAlerts {
     const val ACTION_SKIP = "com.example.action.REST_TIMER_SKIP"
 
     private const val ALARM_CHANNEL_ID = "rest_timer_alarm"
-    internal const val RUNNING_CHANNEL_ID = "rest_timer_running"
+    // Channel importance cannot change after creation, so the default-importance channel has a new id.
+    internal const val RUNNING_CHANNEL_ID = "rest_timer_running_v2"
+    private const val LEGACY_RUNNING_CHANNEL_ID = "rest_timer_running"
     private const val ALARM_NOTIFICATION_ID = 4101
+    private const val ALARM_TIMEOUT_MS = 15_000L
     internal const val RUNNING_NOTIFICATION_ID = 4100
     private var completionListener: android.app.AlarmManager.OnAlarmListener? = null
 
@@ -89,6 +92,11 @@ internal object RestTimerAlerts {
             .commit()
         cancelCompletion(context)
         cancelRunning(context)
+        cancelRestComplete(context)
+    }
+
+    /** Stops the rest-complete alarm sound by removing its notification. */
+    fun cancelRestComplete(context: Context) {
         NotificationManagerCompat.from(context).cancel(ALARM_NOTIFICATION_ID)
     }
 
@@ -132,6 +140,8 @@ internal object RestTimerAlerts {
             .setContentIntent(activityIntent(context, ALARM_NOTIFICATION_ID))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
+            // Alarm tones can run for minutes; the alert only needs to get attention, so it times out.
+            .setTimeoutAfter(ALARM_TIMEOUT_MS)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
@@ -159,15 +169,19 @@ internal object RestTimerAlerts {
         val runningChannel = NotificationChannel(
             RUNNING_CHANNEL_ID,
             "Workout rest countdown",
-            NotificationManager.IMPORTANCE_LOW
+            // Default importance keeps the live workout among the main notifications instead of the collapsed
+            // "Silent" section; it stays quiet because the channel has no sound or vibration.
+            NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "Shows the running rest countdown on the lock screen"
             setSound(null, null)
             enableVibration(false)
+            setShowBadge(false)
         }
         context.getSystemService(NotificationManager::class.java).apply {
             createNotificationChannel(alarmChannel)
             createNotificationChannel(runningChannel)
+            deleteNotificationChannel(LEGACY_RUNNING_CHANNEL_ID)
         }
     }
 
