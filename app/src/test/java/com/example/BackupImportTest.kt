@@ -51,7 +51,7 @@ class BackupImportTest {
             targetWorkSets = 3, repMin = 6, repMax = 8, targetRir = 1, restSeconds = 150))
         dao.insertProgramExercise(ProgramExercise(programDayId = day, exerciseId = custom, orderIndex = 1))
 
-        fun session(start: Long, load: Float, notes: String) {
+        suspend fun session(start: Long, load: Float, notes: String) {
             val id = dao.insertWorkoutSession(WorkoutSession(programDayId = day, gymId = gym.id, title = "Push",
                 startedAt = start, finishedAt = start + 3_600_000, durationMinutes = 60, bodyweight = 82.5f, notes = notes,
                 jointDiscomfort = "Mild", readinessScore = 77, sleepScore = 3))
