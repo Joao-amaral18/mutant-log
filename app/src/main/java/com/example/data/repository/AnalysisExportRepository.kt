@@ -34,6 +34,7 @@ class AnalysisExportRepositoryImpl(
         val cardioList = dao.getAllCardioSessionsSync()
 
         val segmentsBySetId = setSegments.groupBy { it.workoutSetId }
+        val workoutsById = workouts.associateBy { it.id }
         val setsByWorkoutExerciseId = workoutSets.groupBy { it.workoutExerciseId }
         val exercisesByWorkoutId = workoutExercises.groupBy { it.workoutSessionId }
         val programExercisesByDayId = programExercises.groupBy { it.programDayId }
@@ -72,7 +73,7 @@ class AnalysisExportRepositoryImpl(
                     val ex = exerciseMap[pe.exerciseId]
                     ProgramExerciseExport(
                         exerciseId = "ex-${pe.exerciseId}",
-                        variantId = "var-${pe.exerciseId}",
+                        variantId = pe.variantId.ifEmpty { null },
                         name = ex?.name ?: "Exercise ${pe.exerciseId}",
                         position = pe.orderIndex,
                         workSets = pe.targetWorkSets,
@@ -95,21 +96,45 @@ class AnalysisExportRepositoryImpl(
             days = programDaysExport
         )
 
-        val variantsExport = exercises.map { ex ->
-            ExerciseVariantExport(
-                id = "var-${ex.id}",
-                exerciseId = "ex-${ex.id}",
-                exerciseName = ex.baseName.ifEmpty { ex.name },
-                variantName = ex.name,
+        val exercisesExport = exercises.map { ex ->
+            ExerciseExport(
+                id = "ex-${ex.id}",
+                name = ex.name,
+                baseName = ex.baseName.ifEmpty { null },
                 manufacturer = ex.manufacturer.ifEmpty { null },
-                equipmentName = ex.name,
-                gymId = null,
+                muscleGroup = ex.muscleGroup,
+                secondaryMuscles = ex.secondaryMuscles.split(',').map { it.trim() }.filter { it.isNotEmpty() },
+                loadUnit = if (ex.usesStack) "stack_pin" else "kg",
                 resistanceType = resistanceTypeOf(ex),
                 weightIncrementKg = ex.defaultIncrementKg.toDouble(),
                 setup = SetupExport(
                     seat = ex.seatPosition.ifEmpty { null },
                     handle = ex.handlePosition.ifEmpty { null },
                     notes = ex.notes.ifEmpty { null }
+                )
+            )
+        }
+
+        // Only variants a program slot or workout actually points at; the bundled catalog is reference data.
+        val usedVariantIds = (programExercises.map { it.variantId } + workoutExercises.map { it.variantId })
+            .filter { it.isNotEmpty() }.toHashSet()
+        val variantsExport = dao.getAllExerciseVariantsSync().filter { it.id in usedVariantIds }.map { v ->
+            val ex = exerciseMap[v.exerciseId]
+            ExerciseVariantExport(
+                id = v.id,
+                exerciseId = "ex-${v.exerciseId}",
+                exerciseName = ex?.baseName?.ifEmpty { ex.name } ?: v.variantName,
+                variantName = v.variantName,
+                manufacturer = v.manufacturer.ifEmpty { null },
+                equipmentName = v.variantName,
+                gymId = null,
+                resistanceType = v.resistanceType.lowercase().replace('-', '_').replace(' ', '_').ifEmpty { null },
+                weightIncrementKg = v.weightIncrementKg.toDouble(),
+                setup = SetupExport(
+                    seat = v.defaultSeat.ifEmpty { null },
+                    backrest = v.defaultBackrest.ifEmpty { null },
+                    handle = v.defaultHandle.ifEmpty { null },
+                    notes = v.notes.ifEmpty { null }
                 )
             )
         }
@@ -132,7 +157,7 @@ class AnalysisExportRepositoryImpl(
 
                     WorkoutExerciseExport(
                         exerciseId = "ex-${we.exerciseId}",
-                        variantId = "var-${we.exerciseId}",
+                        variantId = we.variantId.ifEmpty { null },
                         name = ex?.name ?: "Exercise ${we.exerciseId}",
                         position = we.orderIndex,
                         target = ExerciseTargetExport(
@@ -191,18 +216,11 @@ class AnalysisExportRepositoryImpl(
             )
         }
 
-        val bodyweightExport = workouts.filter { it.finishedAt != null && it.bodyweight > 0f }.map { session ->
-            BodyweightExport(
-                measuredAt = isoFormat.format(Date(session.finishedAt ?: session.startedAt)),
-                weightKg = session.bodyweight.toDouble()
-            )
-        }
-
         val readinessExport = workouts.filter { it.finishedAt != null }.map { session ->
             ReadinessExport(
                 date = dateFormat.format(Date(session.startedAt)),
                 workoutId = "ws-${session.id}",
-                sleepHours = null,
+                sleepHours = session.sleepHours?.toDouble(),
                 sleepQuality = session.sleepScore,
                 energy = session.energyScore,
                 motivation = session.motivationScore,
@@ -213,7 +231,7 @@ class AnalysisExportRepositoryImpl(
                     "severe" -> 3
                     else -> 0
                 },
-                stress = null,
+                stress = session.stressScore,
                 notes = session.readinessStatus.ifEmpty { null },
                 jointDiscomfortLevel = session.jointDiscomfort.lowercase().ifBlank { "none" },
                 jointAreas = session.jointArea.split(',').map { it.trim() }.filter { it.isNotEmpty() },
@@ -269,11 +287,17 @@ class AnalysisExportRepositoryImpl(
             program = programExport,
             gyms = gymsExport,
             exerciseVariants = variantsExport,
+            exercises = exercisesExport,
             workouts = workoutsExport,
-            bodyweight = bodyweightExport,
             cardio = cardioExport,
             readiness = readinessExport,
-            derived = DerivedExport(),
+            derived = DerivedMetrics.build(
+                workoutExercises.mapNotNull { we ->
+                    val session = workoutsById[we.workoutSessionId] ?: return@mapNotNull null
+                    val ex = exerciseMap[we.exerciseId] ?: return@mapNotNull null
+                    DerivedInput(session, ex, setsByWorkoutExerciseId[we.id] ?: emptyList(), segmentsBySetId)
+                }
+            ),
             backup = backup
         )
     }

@@ -71,6 +71,10 @@ fun ReadinessDialog(
             }
 
             ScaleRow("Sleep", listOf("Awful", "Poor", "OK", "Good", "Great"), input.sleep, "sleep") { input = input.copy(sleep = it) }
+            // Optional extras for analysis: tap again to clear. They do not move the readiness score.
+            OptionalChipRow("Hours slept", "optional", SleepHourOptions.map { it.second }, SleepHourOptions.indexOfFirst { it.first == input.sleepHours }, "sleep_hours") { i ->
+                input = input.copy(sleepHours = i?.let { SleepHourOptions[it].first })
+            }
             ScaleRow("Energy", listOf("Empty", "Low", "OK", "High", "Maxed"), input.energy, "energy") { input = input.copy(energy = it) }
             ScaleRow("Soreness", listOf("None", "Mild", "Moderate", "Strong", "Severe"), input.soreness, "soreness") { input = input.copy(soreness = it) }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -108,6 +112,9 @@ fun ReadinessDialog(
                 placeholder = "e.g. elbow, since biceps day", testTag = "readiness_note"
             )
             ScaleRow("Focus", listOf("None", "Low", "OK", "High", "Locked in"), input.motivation, "focus") { input = input.copy(motivation = it) }
+            OptionalChipRow("Stress", "optional", listOf("1", "2", "3", "4", "5"), (input.stress ?: 0) - 1, "stress") { i ->
+                input = input.copy(stress = i?.plus(1))
+            }
 
             Row(
                 Modifier
@@ -147,6 +154,29 @@ private fun ScaleRow(label: String, hints: List<String>, value: Int, tag: String
                 MutantChoiceChip(
                     label = option.toString(), selected = option == value, onClick = { onSelect(option) },
                     modifier = Modifier.weight(1f).testTag("readiness_${tag}_$option"),
+                    height = 44.dp, cornerRadius = 12.dp, horizontalPadding = 0.dp,
+                    textStyle = MutantType.Chip.copy(fontSize = 13.sp)
+                )
+            }
+        }
+    }
+}
+
+/** Hours slept, as (value, label): the ends stand for "4 or less" and "9 or more". */
+internal val SleepHourOptions = listOf(4f to "≤4", 5f to "5", 6f to "6", 7f to "7", 8f to "8", 9f to "9+")
+
+@Composable
+private fun OptionalChipRow(label: String, hint: String, options: List<String>, selected: Int, tag: String, onSelect: (Int?) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MutantType.RowTitle.copy(fontSize = 14.sp), color = MutantColors.TextPrimary)
+            Text(hint, style = MutantType.Caption.copy(fontWeight = FontWeight.Medium), color = MutantColors.TextSecondary)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            options.forEachIndexed { i, option ->
+                MutantChoiceChip(
+                    label = option, selected = i == selected, onClick = { onSelect(if (i == selected) null else i) },
+                    modifier = Modifier.weight(1f).testTag("readiness_${tag}_${i + 1}"),
                     height = 44.dp, cornerRadius = 12.dp, horizontalPadding = 0.dp,
                     textStyle = MutantType.Chip.copy(fontSize = 13.sp)
                 )

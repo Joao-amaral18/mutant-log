@@ -17,7 +17,10 @@ data class ReadinessInput(
     val motivation: Int = 5,
     // Which joints, and a short note such as "elbow, since biceps day". Only kept when there is discomfort.
     val jointAreas: Set<String> = emptySet(),
-    val note: String = ""
+    val note: String = "",
+    // Optional: hours slept and stress 1-5. Recorded for analysis; they do not change the readiness score.
+    val sleepHours: Float? = null,
+    val stress: Int? = null
 ) {
     val score: Int get() = readinessScore(sleep, energy, soreness, jointDiscomfort, motivation)
 }
@@ -231,6 +234,8 @@ class MutantRepository(private val dao: MutantDao) {
             jointArea = if (readiness.jointDiscomfort.equals("None", ignoreCase = true)) "" else readiness.jointAreas.joinToString(", "),
             readinessNote = readiness.note.trim().take(200),
             motivationScore = readiness.motivation,
+            sleepHours = readiness.sleepHours,
+            stressScore = readiness.stress,
             readinessStatus = calculatedStatus,
             readinessScore = readiness.score
         )
@@ -279,6 +284,8 @@ class MutantRepository(private val dao: MutantDao) {
             jointArea = if (readiness.jointDiscomfort.equals("None", ignoreCase = true)) "" else readiness.jointAreas.joinToString(", "),
             readinessNote = readiness.note.trim().take(200),
             motivationScore = readiness.motivation,
+            sleepHours = readiness.sleepHours,
+            stressScore = readiness.stress,
             readinessStatus = calculatedStatus,
             readinessScore = readiness.score
         )

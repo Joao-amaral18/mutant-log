@@ -16,11 +16,15 @@ data class AnalysisExport(
     val program: ProgramExport?,
 
     val gyms: List<GymExport>,
+    // Equipment variants actually referenced by a workout or program exercise; ids match WorkoutExerciseExport.variantId.
     val exerciseVariants: List<ExerciseVariantExport>,
+    // Every exercise with its muscle, load unit and equipment details; ids match WorkoutExerciseExport.exerciseId.
+    val exercises: List<ExerciseExport> = emptyList(),
 
     val workouts: List<WorkoutExport>,
 
-    val bodyweight: List<BodyweightExport>,
+    // Bodyweight lives on each workout (WorkoutExport.bodyweightKg); this list stays empty and is kept so older readers still parse.
+    val bodyweight: List<BodyweightExport> = emptyList(),
     val cardio: List<CardioExport>,
     val readiness: List<ReadinessExport>,
 
@@ -54,7 +58,61 @@ data class BackupExport(
 
 @Serializable
 data class DerivedExport(
-    val note: String = "Computed metrics (PRs, fatigue, progression) are derived and can be recalculated from raw data"
+    val note: String = "Computed from the raw workouts above; recalculate rather than edit.",
+    val exerciseSessions: List<DerivedExerciseSession> = emptyList(),
+    val weeklyMuscleSets: List<DerivedWeeklyMuscleSets> = emptyList(),
+    val exerciseBests: List<DerivedExerciseBest> = emptyList()
+)
+
+/** One exercise in one finished workout, work sets only (drop-set and rest-pause segments add to reps and volume). */
+@Serializable
+data class DerivedExerciseSession(
+    val workoutId: String,
+    val exerciseId: String,
+    val date: String,
+    val loadUnit: String,
+    val workSets: Int,
+    val totalReps: Int,
+    val topWeightKg: Double,
+    val topReps: Int,
+    // Epley on reps-to-failure (reps + RIR). For stack_pin exercises the unit is pin positions.
+    val bestE1rm: Double,
+    // kg × reps; null for stack_pin exercises.
+    val volumeKg: Double?,
+    // pin × reps; null for kg exercises.
+    val pinVolume: Double?
+)
+
+/** Work sets per primary muscle per ISO week (local time), machine work included. */
+@Serializable
+data class DerivedWeeklyMuscleSets(
+    val week: String,
+    val muscle: String,
+    val workSets: Int
+)
+
+@Serializable
+data class DerivedExerciseBest(
+    val exerciseId: String,
+    val loadUnit: String,
+    val bestE1rm: Double,
+    val bestE1rmDate: String,
+    val sessions: Int
+)
+
+@Serializable
+data class ExerciseExport(
+    val id: String,
+    val name: String,
+    val baseName: String?,
+    val manufacturer: String?,
+    val muscleGroup: String,
+    val secondaryMuscles: List<String> = emptyList(),
+    // "kg", or "stack_pin" when loads are pin positions.
+    val loadUnit: String,
+    val resistanceType: String,
+    val weightIncrementKg: Double,
+    val setup: SetupExport?
 )
 
 @Serializable
@@ -97,7 +155,8 @@ data class ProgramDayExport(
 @Serializable
 data class ProgramExerciseExport(
     val exerciseId: String,
-    val variantId: String,
+    // The equipment variant picked for this slot, or null when none was picked.
+    val variantId: String?,
     val name: String,
 
     val position: Int,
@@ -168,7 +227,8 @@ data class WorkoutExport(
 @Serializable
 data class WorkoutExerciseExport(
     val exerciseId: String,
-    val variantId: String,
+    // The equipment variant used, or null when none was picked.
+    val variantId: String?,
 
     val name: String,
 

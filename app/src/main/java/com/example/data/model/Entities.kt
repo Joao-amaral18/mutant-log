@@ -228,7 +228,10 @@ data class WorkoutSession(
     val isRetroactive: Boolean = false,
     // Pre-workout check-in detail: which joints hurt (comma-separated JointAreas) and the user's own note.
     val jointArea: String = "",
-    val readinessNote: String = ""
+    val readinessNote: String = "",
+    // Optional check-in extras: hours slept last night and stress 1-5; null when skipped.
+    val sleepHours: Float? = null,
+    val stressScore: Int? = null
 )
 
 /** Joints offered by the readiness check-in. */

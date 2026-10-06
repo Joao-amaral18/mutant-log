@@ -169,4 +169,26 @@ class ScheduleUnitRetroTest {
             helper.close()
         }
     }
+
+    @Test fun `migration 8 to 9 adds optional sleep hours and stress`() {
+        val helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context).name(null)
+                .callback(object : SupportSQLiteOpenHelper.Callback(8) {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        db.execSQL("CREATE TABLE workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, title TEXT NOT NULL)")
+                    }
+                    override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+                }).build()
+        )
+        try {
+            val db = helper.writableDatabase
+            db.execSQL("INSERT INTO workout_sessions (title) VALUES ('Legs')")
+            MutantDatabase.MIGRATION_8_9.migrate(db)
+            db.query("SELECT sleepHours, stressScore FROM workout_sessions").use {
+                it.moveToFirst(); assertTrue(it.isNull(0)); assertTrue(it.isNull(1))
+            }
+        } finally {
+            helper.close()
+        }
+    }
 }

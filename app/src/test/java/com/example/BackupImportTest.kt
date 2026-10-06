@@ -76,7 +76,25 @@ class BackupImportTest {
 
     private fun exportJson(dao: MutantDao, legacy: Boolean = false): String = runBlocking {
         val export = AnalysisExportRepositoryImpl(dao).buildExport()
-        json.encodeToString(AnalysisExport.serializer(), if (legacy) export.copy(schemaVersion = 1, backup = null) else export)
+        json.encodeToString(AnalysisExport.serializer(), if (legacy) v1Shape(export) else export)
+    }
+
+    /** A v1 file: no backup, no exercises list, and one pseudo-variant per exercise carrying name and setup only. */
+    private fun v1Shape(export: AnalysisExport) = export.copy(
+        schemaVersion = 1, backup = null, exercises = emptyList(),
+        exerciseVariants = export.exercises.map { e ->
+            ExerciseVariantExport(id = "var-${e.id.removePrefix("ex-")}", exerciseId = e.id, exerciseName = e.baseName ?: e.name,
+                variantName = e.name, manufacturer = e.manufacturer, equipmentName = e.name, gymId = null,
+                resistanceType = e.resistanceType, weightIncrementKg = e.weightIncrementKg, setup = e.setup)
+        }
+    )
+
+    @Test fun `files without a backup keep exercise metadata from the exercises list`() = runBlocking {
+        val source = newDb()
+        seedHistory(source.mutantDao())
+        val export = AnalysisExportRepositoryImpl(source.mutantDao()).buildExport().copy(backup = null)
+        val rows = legacyToBackup(export, 9)
+        assertEquals("Delts", rows.exercises.single { it.name == "Cable Y Raise" }.muscleGroup)
     }
 
     private fun preview(db: MutantDatabase, text: String): ImportPreview =
