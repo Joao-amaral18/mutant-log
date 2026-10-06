@@ -31,6 +31,24 @@ fun legacyToBackup(export: AnalysisExport, databaseVersion: Int): BackupExport {
             source = "user"
         )
     }
+    // Newer files list exercises separately and only carry real variants; their metadata wins.
+    export.exercises.forEach { e ->
+        val id = legacyId(e.id) ?: return@forEach
+        exercises[id] = Exercise(
+            id = id,
+            name = e.name,
+            baseName = e.baseName.orEmpty(),
+            manufacturer = e.manufacturer.orEmpty(),
+            muscleGroup = e.muscleGroup.ifBlank { "Other" },
+            secondaryMuscles = e.secondaryMuscles.joinToString(", "),
+            defaultIncrementKg = e.weightIncrementKg.toFloat().takeIf { it.isFinite() && it > 0f } ?: 2.5f,
+            seatPosition = e.setup?.seat.orEmpty(),
+            handlePosition = e.setup?.handle.orEmpty(),
+            notes = e.setup?.notes.orEmpty(),
+            source = "user",
+            loadUnit = if (e.loadUnit == "stack_pin") LOAD_UNIT_STACK else LOAD_UNIT_KG
+        )
+    }
     // Workouts may name an exercise the variant list does not carry.
     fun exerciseFor(ref: String, name: String): Long? {
         val id = legacyId(ref) ?: return null
@@ -92,7 +110,9 @@ fun legacyToBackup(export: AnalysisExport, databaseVersion: Int): BackupExport {
             jointDiscomfort = JointLabels.getOrElse(readiness?.jointDiscomfort ?: 0) { "None" },
             readinessStatus = readiness?.notes ?: "Normal",
             jointArea = readiness?.jointAreas.orEmpty().joinToString(", "),
-            readinessNote = readiness?.note.orEmpty()
+            readinessNote = readiness?.note.orEmpty(),
+            sleepHours = readiness?.sleepHours?.toFloat(),
+            stressScore = readiness?.stress
         )
         w.exercises.forEach { we ->
             val exerciseId = exerciseFor(we.exerciseId, we.name) ?: return@forEach
