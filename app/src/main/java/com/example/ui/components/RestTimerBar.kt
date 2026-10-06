@@ -15,6 +15,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.*
@@ -60,6 +62,9 @@ fun RestTimerBar(
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val visible = remainingSeconds > 0 || isRunning || isComplete
+    // Rating is optional, so it stays folded and the bar leaves room for the logger above the keyboard.
+    var rateOpen by remember { mutableStateOf(false) }
+    val rated = executionQuality != null || targetMuscleQuality != null
 
     // Longest countdown seen in this rest period, so +30 grows the bar instead of overflowing it.
     var longest by remember { mutableIntStateOf(plannedSeconds) }
@@ -104,9 +109,9 @@ fun RestTimerBar(
                 .background(MutantColors.SurfaceContainerHigh, RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
                 .border(1.dp, MutantColors.Outline, RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
                 .navigationBarsPadding()
-                .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 16.dp)
+                .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 8.dp)
                 .testTag("rest_timer_bar"),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(Modifier.fillMaxWidth().height(4.dp).background(MutantColors.Outline, RoundedCornerShape(2.dp))) {
                 Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).fillMaxHeight().background(accent, RoundedCornerShape(2.dp)))
@@ -143,9 +148,11 @@ fun RestTimerBar(
                     RoundTextButton("+30", "Add 30 seconds", "rest_plus_30") { onAdjustTime(30) }
                 }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                FeedbackRow("FORM", FormOptions, executionQuality, "form", onExecutionQuality)
-                FeedbackRow("TARGET", TargetOptions, targetMuscleQuality, "target", onTargetMuscleQuality)
+            if (rateOpen) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FeedbackRow("FORM", FormOptions, executionQuality, "form", onExecutionQuality)
+                    FeedbackRow("TARGET", TargetOptions, targetMuscleQuality, "target", onTargetMuscleQuality)
+                }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 TextButton(
@@ -164,7 +171,7 @@ fun RestTimerBar(
                         }
                     },
                     contentPadding = PaddingValues(0.dp),
-                    modifier = Modifier.height(36.dp).testTag("rest_timer_alarm_toggle")
+                    modifier = Modifier.height(44.dp).testTag("rest_timer_alarm_toggle")
                 ) {
                     Icon(if (alarmEnabled) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff,
                         contentDescription = null, tint = MutantColors.TextSecondary, modifier = Modifier.size(18.dp))
@@ -172,9 +179,19 @@ fun RestTimerBar(
                     Text(if (alarmEnabled) "Sound + alert" else "Silent", style = MutantType.Caption.copy(fontWeight = FontWeight.Medium),
                         color = MutantColors.TextSecondary)
                 }
+                TextButton(
+                    onClick = { rateOpen = !rateOpen },
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    modifier = Modifier.height(44.dp).testTag("rest_rate_toggle")
+                ) {
+                    Text(if (rated) "Rated ✓" else "Rate set", style = MutantType.Caption.copy(fontWeight = FontWeight.Medium),
+                        color = if (rated) MutantColors.Success else MutantColors.Primary)
+                    Icon(if (rateOpen) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null,
+                        tint = MutantColors.TextSecondary, modifier = Modifier.size(18.dp))
+                }
                 Button(
                     onClick = onSkip,
-                    modifier = Modifier.height(36.dp).testTag("rest_skip"),
+                    modifier = Modifier.height(44.dp).testTag("rest_skip"),
                     shape = RoundedCornerShape(18.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MutantColors.Line, contentColor = MutantColors.TextPrimary)
@@ -215,7 +232,7 @@ private fun FeedbackRow(
                     selected = selectedValue.equals(value, ignoreCase = true),
                     onClick = { onSelect(value) },
                     modifier = Modifier.weight(1f).testTag("feedback_${tag}_$value"),
-                    height = 34.dp, cornerRadius = 10.dp, horizontalPadding = 0.dp
+                    height = 44.dp, cornerRadius = 12.dp, horizontalPadding = 0.dp
                 )
             }
         }

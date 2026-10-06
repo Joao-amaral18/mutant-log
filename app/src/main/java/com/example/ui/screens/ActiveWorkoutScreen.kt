@@ -13,6 +13,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.data.model.*
@@ -133,6 +137,15 @@ fun ActiveWorkoutScreen(
     val workoutExercise = currentExDetail.workoutExercise
     val progression = state.currentProgression
     val coroutineScope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val haptic = LocalHapticFeedback.current
+
+    // The screen stays lit between sets while a session is open.
+    val view = LocalView.current
+    DisposableEffect(view) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
+    }
 
     // Transient input for the next set. The chosen load/reps are mirrored to Room as the next-set plan.
     var selectedSetType by remember(workoutExercise.id) { mutableStateOf(SetType.WORK) }
@@ -183,6 +196,7 @@ fun ActiveWorkoutScreen(
     LaunchedEffect(prSetIds) {
         val known = announcedPrs
         val fresh = prSetIds.filter { known != null && it.first !in known }
+        if (fresh.isNotEmpty()) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         fresh.lastOrNull()?.let { (_, ex) -> toast.show("New PR on ${ex.baseName.ifBlank { ex.name }}!") }
         announcedPrs = prSetIds.map { it.first }.toSet()
     }
@@ -387,6 +401,8 @@ fun ActiveWorkoutScreen(
                     defaultRestSeconds = if (selectedSetType == SetType.WARMUP) 60 else currentExDetail.plannedRestSeconds,
                     muscleGroup = exercise.muscleGroup
                 )
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                focusManager.clearFocus()
                 attachedSegments = emptyList()
                 selectedTechnique = IntensityTechnique.NONE
                 selectedSetType = SetType.WORK
