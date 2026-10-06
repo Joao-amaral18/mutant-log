@@ -163,7 +163,7 @@ internal fun HistoryExerciseDetail(summary: HistoryExerciseSummary, onBack: () -
             items(summary.performances, key = { "session-${it.workout.session.id}" }) { performance ->
                 MutantCard(onClick = { onSession(performance.workout.session.id) }, testTag = "history_exercise_session_${performance.workout.session.id}") {
                     Text("${performance.workout.session.title} ›", style = MutantType.Title, color = MutantColors.TextPrimary)
-                    Text("${historyDate(performance.workout.session.startedAt, "EEE MMM d, yyyy")} · ${performance.sets.size} sets · ${historyNumber(performance.volume)} kg",
+                    Text("${historyDate(performance.workout.session.startedAt, "EEE MMM d, yyyy")} · ${performance.sets.size} sets · ${if (performance.pinVolume > 0) "${historyNumber(performance.pinVolume)} pin·reps" else "${historyNumber(performance.volume)} kg"}",
                         style = MutantType.Caption, color = MutantColors.TextSecondary, modifier = Modifier.padding(top = 4.dp))
                     performance.entries.forEach { entry ->
                         if (entry.workoutExercise.notes.isNotBlank()) Text(entry.workoutExercise.notes, color = MutantColors.TextSecondary)

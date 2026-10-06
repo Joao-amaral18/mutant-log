@@ -55,7 +55,9 @@ object ProgressionEngine {
             )
         }
 
-        val baseWeight = workSets.first().weightKg
+        // Back-off sets run lighter than the top set; the next target builds on the heaviest load, not the first one logged.
+        val baseWeight = workSets.maxOf { it.weightKg }
+        val topSets = workSets.filter { it.weightKg >= baseWeight }
         val historySummaries = workSets.map {
             SetSummary(it.weightKg, it.reps, it.rir, isWorkSet = true, technique = it.technique)
         }
@@ -83,8 +85,9 @@ object ProgressionEngine {
         }
 
         // Check if all work sets reached or exceeded repMax and respected target RIR
-        val allHitTopRepRange = workSets.all { it.reps >= repMax }
-        val rirRespected = workSets.all { it.rir <= targetRir + 1 }
+        val allHitTopRepRange = topSets.all { it.reps >= repMax }
+        // One set may stop a rep short of the target; the average has to be on target, so RIR 1 on every set of a 0-RIR plan holds the load.
+        val rirRespected = topSets.all { it.rir <= targetRir + 1 } && topSets.map { it.rir }.average() <= targetRir + 0.5
 
         return if (allHitTopRepRange && rirRespected) {
             val newWeight = baseWeight + incrementKg
@@ -117,3 +120,7 @@ object ProgressionEngine {
         return if (this % 1f == 0f) this.toInt().toString() else "%.1f".format(this)
     }
 }
+
+/** Pin steps default to one position; a stack exercise whose increment was changed from the 2.5 default keeps that step. */
+val Exercise.progressionStepKg: Float
+    get() = if (usesStack && defaultIncrementKg == 2.5f) 1f else defaultIncrementKg

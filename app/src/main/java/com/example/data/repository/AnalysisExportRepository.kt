@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import com.example.BuildConfig
 import com.example.data.db.MUTANT_DB_VERSION
 import com.example.data.db.MutantDao
 import com.example.data.model.*
@@ -39,7 +40,7 @@ class AnalysisExportRepositoryImpl(
 
         val appExport = AppExport(
             name = "Mutant Log",
-            version = "1.0.0",
+            version = BuildConfig.VERSION_NAME,
             databaseVersion = MUTANT_DB_VERSION
         )
 
@@ -77,7 +78,7 @@ class AnalysisExportRepositoryImpl(
                         workSets = pe.targetWorkSets,
                         repMin = pe.repMin,
                         repMax = pe.repMax,
-                        rirMin = 0.0,
+                        rirMin = pe.targetRir.toDouble(),
                         rirMax = pe.targetRir.toDouble(),
                         restSecondsMin = pe.restSeconds,
                         restSecondsMax = pe.restSeconds,
@@ -103,13 +104,7 @@ class AnalysisExportRepositoryImpl(
                 manufacturer = ex.manufacturer.ifEmpty { null },
                 equipmentName = ex.name,
                 gymId = null,
-                resistanceType = when {
-                    ex.name.contains("Machine", ignoreCase = true) -> "machine"
-                    ex.name.contains("Cable", ignoreCase = true) -> "cable"
-                    ex.name.contains("Dumbbell", ignoreCase = true) -> "free_weight_dumbbell"
-                    ex.name.contains("Barbell", ignoreCase = true) -> "free_weight_barbell"
-                    else -> "selectorized"
-                },
+                resistanceType = resistanceTypeOf(ex),
                 weightIncrementKg = ex.defaultIncrementKg.toDouble(),
                 setup = SetupExport(
                     seat = ex.seatPosition.ifEmpty { null },
@@ -144,17 +139,20 @@ class AnalysisExportRepositoryImpl(
                             workSets = pEx?.targetWorkSets ?: ex?.defaultWorkSets,
                             repMin = pEx?.repMin ?: ex?.defaultRepMin,
                             repMax = pEx?.repMax ?: ex?.defaultRepMax,
-                            rirMin = 0.0,
+                            rirMin = (pEx?.targetRir ?: ex?.defaultRir ?: 0).toDouble(),
                             rirMax = (pEx?.targetRir ?: ex?.defaultRir ?: 0).toDouble(),
                             restSecondsMin = pEx?.restSeconds ?: ex?.defaultRestSeconds,
                             restSecondsMax = pEx?.restSeconds ?: ex?.defaultRestSeconds
                         ),
+                        executionQuality = we.executionQuality.lowercase().ifEmpty { "good" },
+                        targetMuscleQuality = we.targetMuscleQuality.lowercase().ifEmpty { "good" },
                         setup = SetupExport(
                             seat = we.seatPosition.ifEmpty { ex?.seatPosition?.ifEmpty { null } },
                             handle = we.handlePosition.ifEmpty { ex?.handlePosition?.ifEmpty { null } },
                             notes = we.notes.ifEmpty { null }
                         ),
-                        sets = wSets.map { s ->
+                        sets = wSets.sortedBy { it.setNumber }.let { ordered ->
+                          ordered.mapIndexed { i, s ->
                             val segs = segmentsBySetId[s.id] ?: emptyList()
                             WorkoutSetExport(
                                 sequence = s.setNumber,
@@ -166,10 +164,12 @@ class AnalysisExportRepositoryImpl(
                                 weightKg = s.weightKg.toDouble(),
                                 reps = s.reps,
                                 rir = s.rir.toDouble(),
-                                executionQuality = we.executionQuality.lowercase().ifEmpty { "good" },
-                                targetMuscleQuality = we.targetMuscleQuality.lowercase().ifEmpty { "good" },
+                                // Quality is rated per exercise; see WorkoutExerciseExport.
+                                executionQuality = null,
+                                targetMuscleQuality = null,
                                 performedAt = isoFormat.format(Date(s.completedAt)),
-                                restAfterSeconds = ex?.defaultRestSeconds,
+                                restAfterSeconds = actualRestSeconds(session.isRetroactive, s, ordered.getOrNull(i + 1)),
+                                plannedRestSeconds = pEx?.restSeconds ?: ex?.defaultRestSeconds,
                                 technique = s.technique.name.lowercase(),
                                 loadUnit = if (ex?.usesStack == true) "stack_pin" else "kg",
                                 segments = segs.map { seg ->
@@ -184,20 +184,21 @@ class AnalysisExportRepositoryImpl(
                                 },
                                 notes = null
                             )
+                          }
                         }
                     )
                 }
             )
         }
 
-        val bodyweightExport = workouts.filter { it.bodyweight > 0f }.map { session ->
+        val bodyweightExport = workouts.filter { it.finishedAt != null && it.bodyweight > 0f }.map { session ->
             BodyweightExport(
                 measuredAt = isoFormat.format(Date(session.finishedAt ?: session.startedAt)),
                 weightKg = session.bodyweight.toDouble()
             )
         }
 
-        val readinessExport = workouts.map { session ->
+        val readinessExport = workouts.filter { it.finishedAt != null }.map { session ->
             ReadinessExport(
                 date = dateFormat.format(Date(session.startedAt)),
                 workoutId = "ws-${session.id}",
@@ -276,4 +277,24 @@ class AnalysisExportRepositoryImpl(
             backup = backup
         )
     }
+}
+
+/** Pin-loaded stacks are "selectorized"; kg-logged machines are plate-loaded; the rest follows the name. */
+internal fun resistanceTypeOf(ex: Exercise): String {
+    val name = ex.name.lowercase()
+    return when {
+        ex.usesStack -> "selectorized"
+        "cable" in name -> "cable"
+        "dumbbell" in name -> "free_weight_dumbbell"
+        "barbell" in name -> "free_weight_barbell"
+        "machine" in name || ex.manufacturer.isNotEmpty() -> "plate_loaded"
+        else -> "other"
+    }
+}
+
+/** Seconds from this set to the next set of the same exercise; null for the last set or hand-entered sessions. */
+internal fun actualRestSeconds(retroactive: Boolean, set: WorkoutSet, next: WorkoutSet?): Int? {
+    if (retroactive || next == null) return null
+    val gap = ((next.completedAt - set.completedAt) / 1000).toInt()
+    return gap.takeIf { it > 0 }
 }

@@ -380,8 +380,8 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                 repMin = currentExDetail.repMin,
                 repMax = currentExDetail.repMax,
                 targetRir = currentExDetail.plannedRir,
-                // A pin-loaded stack moves one position at a time.
-                incrementKg = if (currentEx.usesStack) 1f else currentEx.defaultIncrementKg,
+                // A pin-loaded stack moves one position at a time unless its increment was customised.
+                incrementKg = currentEx.progressionStepKg,
                 stack = currentEx.usesStack
             )
             val previous = repository.getPreviousWorkSets(currentEx.id)
@@ -391,7 +391,7 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
                     repMin = next.repMin,
                     repMax = next.repMax,
                     targetRir = next.plannedRir,
-                    incrementKg = if (next.exercise.usesStack) 1f else next.exercise.defaultIncrementKg,
+                    incrementKg = next.exercise.progressionStepKg,
                     stack = next.exercise.usesStack
                 )
             }

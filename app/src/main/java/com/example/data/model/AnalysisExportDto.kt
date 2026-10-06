@@ -178,6 +178,10 @@ data class WorkoutExerciseExport(
 
     val setup: SetupExport?,
 
+    // Rated once per exercise; the per-set fields below are null.
+    val executionQuality: String? = null,
+    val targetMuscleQuality: String? = null,
+
     val sets: List<WorkoutSetExport>
 )
 
@@ -209,7 +213,10 @@ data class WorkoutSetExport(
 
     val performedAt: String?,
 
+    // Measured gap to the next set of the same exercise; null for the last set and for retroactive sessions.
     val restAfterSeconds: Int?,
+    // The rest the program prescribed, kept separate from what was measured.
+    val plannedRestSeconds: Int? = null,
 
     val technique: String?,
 

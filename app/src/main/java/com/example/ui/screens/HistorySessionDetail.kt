@@ -31,7 +31,7 @@ internal fun HistorySessionDetail(workout: HistoryWorkout, all: List<HistoryWork
                 MutantEyebrow(historyDate(workout.session.startedAt, "EEE MMM d, yyyy").uppercase(historyLocale), style = MutantType.Eyebrow.copy(fontSize = 10.5.sp))
                 Text("${historyDate(workout.session.startedAt, "HH:mm")} → ${historyDate(requireNotNull(workout.session.finishedAt), "HH:mm")} · ${historyDuration(workout.minutes)}",
                     style = MutantType.Body, color = MutantColors.TextSecondary, modifier = Modifier.padding(top = 6.dp, bottom = 12.dp))
-                HistoryMetrics(listOf("Sets" to workout.sets.size.toString(), "Reps" to workout.reps.toString(), "Volume" to "${historyNumber(workout.volume)} kg", "PRs" to workout.prs.toString()))
+                HistoryMetrics(listOf("Sets" to workout.sets.size.toString(), "Reps" to workout.reps.toString(), "Volume" to "${historyNumber(workout.volume)} kg", "PRs" to workout.prs.toString()) + pinVolumeMetric(workout))
                 // The check-in happens before the workout: say so, so a joint issue isn't read as caused by this session.
                 val s = workout.session
                 if (!s.jointDiscomfort.equals("None", ignoreCase = true) || s.readinessNote.isNotBlank()) {
@@ -87,7 +87,7 @@ internal fun HistorySessionDetail(workout: HistoryWorkout, all: List<HistoryWork
             }
             item {
                 MutantEyebrow("SUMMARY", modifier = Modifier.padding(bottom = 8.dp), style = MutantType.Eyebrow.copy(fontSize = 10.5.sp))
-                HistoryMetrics(listOf("Exercises" to workout.exercises.size.toString(), "Sets" to workout.sets.size.toString(), "Reps" to workout.reps.toString(), "Volume" to "${historyNumber(workout.volume)} kg", "Duration" to historyDuration(workout.minutes), "PRs" to workout.prs.toString()))
+                HistoryMetrics(listOf("Exercises" to workout.exercises.size.toString(), "Sets" to workout.sets.size.toString(), "Reps" to workout.reps.toString(), "Volume" to "${historyNumber(workout.volume)} kg", "Duration" to historyDuration(workout.minutes), "PRs" to workout.prs.toString()) + pinVolumeMetric(workout))
                 Text("Work totals include drop-set and rest-pause segments. Warm-ups are excluded.", style = MaterialTheme.typography.bodySmall, color = MutantColors.TextSecondary)
             }
             item {
@@ -127,3 +127,7 @@ private fun HistoryComparison(label: String, value: String, delta: Double, unit:
         Text(if (delta == 0.0) "=" else "${if (delta > 0) "+" else ""}${historyNumber(delta)}$unit", color = if (delta > 0) MutantColors.Success else MutantColors.TextSecondary, style = MaterialTheme.typography.bodyMedium)
     }
 }
+
+/** Machine work is logged in pin positions, so it gets its own figure instead of vanishing from kg volume. */
+private fun pinVolumeMetric(workout: HistoryWorkout): List<Pair<String, String>> =
+    if (workout.pinVolume > 0) listOf("Pin vol" to historyNumber(workout.pinVolume)) else emptyList()
