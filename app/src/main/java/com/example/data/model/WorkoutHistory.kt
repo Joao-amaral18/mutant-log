@@ -18,7 +18,8 @@ data class HistoryExercise(val workoutExercise: WorkoutExercise, val exercise: E
     val pinVolume by once { if (exercise.usesStack) workSets.sumOf { it.volume } else 0.0 }
     val reps by once { workSets.sumOf { it.reps } }
     val bestSet by once { workSets.maxWithOrNull(compareBy<HistorySet> { it.set.weightKg }.thenBy { it.set.reps })?.set }
-    val e1rm by once { workSets.maxOfOrNull { it.set.weightKg.toDouble() * (1 + it.set.reps / 30.0) } ?: 0.0 }
+    // Same estimate as the export: Epley on reps to failure (reps + RIR). Pin loads give a pin-scale value.
+    val e1rm by once { workSets.maxOfOrNull { DerivedMetrics.e1rm(it.set.weightKg.toDouble(), it.set.reps, it.set.rir) } ?: 0.0 }
 }
 
 data class HistoryWorkout(val session: WorkoutSession, val exercises: List<HistoryExercise>, val cardio: List<CardioSession> = emptyList()) {

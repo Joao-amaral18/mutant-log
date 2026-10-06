@@ -112,7 +112,9 @@ fun legacyToBackup(export: AnalysisExport, databaseVersion: Int): BackupExport {
             jointArea = readiness?.jointAreas.orEmpty().joinToString(", "),
             readinessNote = readiness?.note.orEmpty(),
             sleepHours = readiness?.sleepHours?.toFloat(),
-            stressScore = readiness?.stress
+            stressScore = readiness?.stress,
+            // Workouts without a readiness entry had no check-in.
+            readinessRecorded = readiness != null
         )
         w.exercises.forEach { we ->
             val exerciseId = exerciseFor(we.exerciseId, we.name) ?: return@forEach
@@ -122,8 +124,8 @@ fun legacyToBackup(export: AnalysisExport, databaseVersion: Int): BackupExport {
                 id = weId, workoutSessionId = sessionId, exerciseId = exerciseId, orderIndex = we.position,
                 notes = we.setup?.notes.orEmpty(),
                 seatPosition = we.setup?.seat.orEmpty(), handlePosition = we.setup?.handle.orEmpty(),
-                executionQuality = (we.executionQuality ?: first?.executionQuality)?.capitalized() ?: "Good",
-                targetMuscleQuality = (we.targetMuscleQuality ?: first?.targetMuscleQuality)?.capitalized() ?: "Good",
+                executionQuality = (we.executionQuality ?: first?.executionQuality)?.capitalized() ?: "",
+                targetMuscleQuality = (we.targetMuscleQuality ?: first?.targetMuscleQuality)?.capitalized() ?: "",
                 targetWorkSets = we.target?.workSets?.coerceAtLeast(1),
                 targetRepMin = we.target?.repMin, targetRepMax = we.target?.repMax,
                 targetRir = we.target?.rirMax?.toInt(), restSeconds = we.target?.restSecondsMin

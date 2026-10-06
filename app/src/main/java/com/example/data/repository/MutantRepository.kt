@@ -214,31 +214,19 @@ class MutantRepository(private val dao: MutantDao) {
     suspend fun startWorkoutSession(
         programDay: ProgramDay,
         gymId: Long,
-        readiness: ReadinessInput,
+        readiness: ReadinessInput?,
         startedAt: Long = System.currentTimeMillis(),
         retroactiveMinutes: Int? = null
     ): Long = withContext(Dispatchers.IO) {
-        val calculatedStatus = calculateReadinessStatus(readiness)
-        val session = WorkoutSession(
+        val session = withReadiness(WorkoutSession(
             programDayId = programDay.id,
             gymId = gymId,
             title = programDay.title,
             startedAt = startedAt,
             finishedAt = null,
             durationMinutes = retroactiveMinutes ?: 0,
-            isRetroactive = retroactiveMinutes != null,
-            sleepScore = readiness.sleep,
-            energyScore = readiness.energy,
-            sorenessScore = readiness.soreness,
-            jointDiscomfort = readiness.jointDiscomfort,
-            jointArea = if (readiness.jointDiscomfort.equals("None", ignoreCase = true)) "" else readiness.jointAreas.joinToString(", "),
-            readinessNote = readiness.note.trim().take(200),
-            motivationScore = readiness.motivation,
-            sleepHours = readiness.sleepHours,
-            stressScore = readiness.stress,
-            readinessStatus = calculatedStatus,
-            readinessScore = readiness.score
-        )
+            isRetroactive = retroactiveMinutes != null
+        ), readiness)
 
         // Pre-populate workout exercises from program day
         val programExercises = dao.getProgramExercisesForDay(programDay.id).firstOrNull() ?: emptyList()
@@ -256,8 +244,8 @@ class MutantRepository(private val dao: MutantDao) {
                 seatPosition = peDetail.exercise.seatPosition,
                 handlePosition = peDetail.exercise.handlePosition,
                 notes = peDetail.exercise.notes,
-                executionQuality = "Good",
-                targetMuscleQuality = "Good"
+                executionQuality = "",
+                targetMuscleQuality = ""
             )
             we
         }
@@ -268,27 +256,15 @@ class MutantRepository(private val dao: MutantDao) {
         title: String,
         gymId: Long,
         exerciseIds: List<Long>,
-        readiness: ReadinessInput
+        readiness: ReadinessInput?
     ): Long = withContext(Dispatchers.IO) {
-        val calculatedStatus = calculateReadinessStatus(readiness)
-        val session = WorkoutSession(
+        val session = withReadiness(WorkoutSession(
             programDayId = null,
             gymId = gymId,
             title = title,
             startedAt = System.currentTimeMillis(),
-            finishedAt = null,
-            sleepScore = readiness.sleep,
-            energyScore = readiness.energy,
-            sorenessScore = readiness.soreness,
-            jointDiscomfort = readiness.jointDiscomfort,
-            jointArea = if (readiness.jointDiscomfort.equals("None", ignoreCase = true)) "" else readiness.jointAreas.joinToString(", "),
-            readinessNote = readiness.note.trim().take(200),
-            motivationScore = readiness.motivation,
-            sleepHours = readiness.sleepHours,
-            stressScore = readiness.stress,
-            readinessStatus = calculatedStatus,
-            readinessScore = readiness.score
-        )
+            finishedAt = null
+        ), readiness)
 
         val exercises = exerciseIds.mapIndexed { index, exId ->
             val ex = dao.getExerciseById(exId)
@@ -299,13 +275,30 @@ class MutantRepository(private val dao: MutantDao) {
                 seatPosition = ex?.seatPosition ?: "",
                 handlePosition = ex?.handlePosition ?: "",
                 notes = ex?.notes ?: "",
-                executionQuality = "Good",
-                targetMuscleQuality = "Good"
+                executionQuality = "",
+                targetMuscleQuality = ""
             )
             we
         }
         dao.createWorkoutSession(session, exercises)
     }
+
+    /** Copies the check-in onto the session, or marks it as not recorded when there was none. */
+    private fun withReadiness(session: WorkoutSession, readiness: ReadinessInput?): WorkoutSession =
+        if (readiness == null) session.copy(readinessRecorded = false, readinessScore = null, readinessStatus = "Not recorded")
+        else session.copy(
+            sleepScore = readiness.sleep,
+            energyScore = readiness.energy,
+            sorenessScore = readiness.soreness,
+            jointDiscomfort = readiness.jointDiscomfort,
+            jointArea = if (readiness.jointDiscomfort.equals("None", ignoreCase = true)) "" else readiness.jointAreas.joinToString(", "),
+            readinessNote = readiness.note.trim().take(200),
+            motivationScore = readiness.motivation,
+            sleepHours = readiness.sleepHours,
+            stressScore = readiness.stress,
+            readinessStatus = calculateReadinessStatus(readiness),
+            readinessScore = readiness.score
+        )
 
     private fun calculateReadinessStatus(r: ReadinessInput): String {
         val isJointHigh = r.jointDiscomfort.equals("Severe", ignoreCase = true) ||

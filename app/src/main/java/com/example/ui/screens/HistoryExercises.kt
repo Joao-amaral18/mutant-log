@@ -60,7 +60,7 @@ internal fun HistoryExerciseList(summaries: List<HistoryExerciseSummary>, onOpen
         if (matching.isEmpty()) item { HistoryEmpty("No exercises yet.", "Exercises from finished sessions show up here.") }
         items(matching, key = { it.exercise.id }) { summary -> HistoryExerciseRow(summary) { onOpen(summary.exercise.id) } }
         if (matching.isNotEmpty()) item {
-            Text("Right column: estimated 1RM (kg)", style = MutantType.MonoLabel.copy(fontWeight = FontWeight.Normal),
+            Text("Right column: estimated 1RM (kg; pin position for stack machines)", style = MutantType.MonoLabel.copy(fontWeight = FontWeight.Normal),
                 color = MutantColors.TextMetadata, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
         }
     }
@@ -131,7 +131,8 @@ internal fun HistoryExerciseDetail(summary: HistoryExerciseSummary, onBack: () -
         HistoryHeader(summary.exercise.name, onBack)
         LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(MutantSpacing.md)) {
             item {
-                HistoryMetrics(listOf("Last performance" to (summary.latest.bestSet?.let { "${historyNumber(it.weightKg)} kg × ${it.reps}" } ?: "—"), "Best load" to (summary.bestSet?.let { "${historyNumber(it.weightKg)} kg × ${it.reps}" } ?: "—"), "Estimated e1RM" to "${historyNumber(summary.e1rm)} kg", "Sessions" to summary.performances.size.toString()))
+                val stack = summary.exercise.usesStack
+                HistoryMetrics(listOf("Last performance" to (summary.latest.bestSet?.let { "${loadText(it.weightKg, stack)} × ${it.reps}" } ?: "—"), "Best load" to (summary.bestSet?.let { "${loadText(it.weightKg, stack)} × ${it.reps}" } ?: "—"), "Estimated e1RM" to loadText(Math.round(summary.e1rm * 10) / 10f, stack), "Sessions" to summary.performances.size.toString()))
             }
             item {
                 MutantEyebrow("PROGRESS", modifier = Modifier.padding(bottom = 8.dp), style = MutantType.Eyebrow.copy(fontSize = 10.5.sp))

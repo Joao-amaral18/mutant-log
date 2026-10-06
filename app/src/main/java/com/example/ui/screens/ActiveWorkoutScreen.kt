@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.data.model.*
-import com.example.data.repository.ReadinessInput
 import com.example.ui.components.*
 import com.example.ui.designsystem.MutantColors
 import com.example.ui.designsystem.MutantMotion
@@ -80,7 +79,7 @@ fun ActiveWorkoutScreen(
             error = startWorkoutError,
             onDismiss = { showFreeSessionDialog = false },
             onStart = { title, exerciseIds ->
-                viewModel.startAdHocWorkout(title = title, exerciseIds = exerciseIds, readiness = ReadinessInput()) {
+                viewModel.startAdHocWorkout(title = title, exerciseIds = exerciseIds, readiness = null) {
                     showFreeSessionDialog = false
                 }
             }

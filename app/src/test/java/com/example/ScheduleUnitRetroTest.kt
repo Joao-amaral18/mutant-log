@@ -191,4 +191,54 @@ class ScheduleUnitRetroTest {
             helper.close()
         }
     }
+
+    @Test fun `a workout without a check-in exports no readiness and unrated quality as null`() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, MutantDatabase::class.java).allowMainThreadQueries().build()
+        try {
+            val dao = db.mutantDao()
+            val exercise = dao.insertExercise(Exercise(name = "Row", muscleGroup = "Back"))
+            val program = dao.insertProgram(Program(name = "Split"))
+            val day = dao.insertProgramDay(ProgramDay(programId = program, dayIndex = 0, dayCode = "MON", title = "Back"))
+            dao.insertProgramExercise(ProgramExercise(programDayId = day, exerciseId = exercise, orderIndex = 0))
+            val repo = MutantRepository(dao)
+            val past = repo.startWorkoutSession(dao.getProgramDayById(day)!!, 1, readiness = null, startedAt = 1_780_000_000_000L, retroactiveMinutes = 60)
+            repo.logSet(dao.getWorkoutDetailsSync(past).single().workoutExercise.id, SetType.WORK, 50f, 10, 1, IntensityTechnique.NONE)
+            repo.finishWorkout(past)
+            val session = dao.getSessionSync(past)!!
+            assertFalse(session.readinessRecorded)
+            assertNull(session.readinessScore)
+
+            val export = com.example.data.repository.AnalysisExportRepositoryImpl(dao).buildExport()
+            assertTrue(export.readiness.none { it.workoutId == "ws-$past" })
+            val ex = export.workouts.single { it.id == "ws-$past" }.exercises.single()
+            assertNull(ex.executionQuality)
+            assertNull(ex.targetMuscleQuality)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test fun `migration 9 to 10 marks past and free workouts as having no check-in`() {
+        val helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context).name(null)
+                .callback(object : SupportSQLiteOpenHelper.Callback(9) {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        db.execSQL("CREATE TABLE workout_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, programDayId INTEGER, isRetroactive INTEGER NOT NULL, readinessScore INTEGER, readinessStatus TEXT NOT NULL)")
+                    }
+                    override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+                }).build()
+        )
+        try {
+            val db = helper.writableDatabase
+            db.execSQL("INSERT INTO workout_sessions (programDayId, isRetroactive, readinessScore, readinessStatus) VALUES (1, 0, 80, 'Normal'), (1, 1, 77, 'Normal'), (NULL, 0, 77, 'Normal')")
+            MutantDatabase.MIGRATION_9_10.migrate(db)
+            db.query("SELECT readinessRecorded, readinessScore, readinessStatus FROM workout_sessions ORDER BY id").use {
+                it.moveToNext(); assertEquals(1, it.getInt(0)); assertEquals(80, it.getInt(1))
+                it.moveToNext(); assertEquals(0, it.getInt(0)); assertTrue(it.isNull(1)); assertEquals("Not recorded", it.getString(2))
+                it.moveToNext(); assertEquals(0, it.getInt(0))
+            }
+        } finally {
+            helper.close()
+        }
+    }
 }
