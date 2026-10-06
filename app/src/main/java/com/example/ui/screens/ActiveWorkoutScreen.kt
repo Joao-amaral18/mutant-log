@@ -140,7 +140,7 @@ fun ActiveWorkoutScreen(
     var weightInput by remember(workoutExercise.id, progression?.suggestedWeightKg) {
         val initialWeight = workoutExercise.nextSetWeightKg
             ?: targetFor(progression, state.previousWorkSets, currentExDetail)?.first
-            ?: progression?.suggestedWeightKg ?: 60f
+            ?: progression?.suggestedWeightKg ?: 0f
         mutableStateOf(loadLabel(initialWeight))
     }
     var repsInput by remember(workoutExercise.id, progression?.suggestedRepsMin) {
@@ -190,7 +190,7 @@ fun ActiveWorkoutScreen(
 
     if (showIntensityDialog) {
         IntensitySegmentDialog(
-            initialWeight = weightInput.toFloatOrNull() ?: 60f,
+            initialWeight = weightInput.toFloatOrNull() ?: 0f,
             initialReps = repsInput.toIntOrNull() ?: 10,
             techniqueName = if (selectedTechnique == IntensityTechnique.REST_PAUSE) "Rest-pause" else "Drop set",
             onDismiss = { showIntensityDialog = false },
@@ -372,7 +372,11 @@ fun ActiveWorkoutScreen(
         onOpenList = { listOpen = true },
         elapsedSeconds = { clock.value.elapsedSeconds },
         pastWorkoutLabel = session?.takeIf { it.isRetroactive }?.let { pastWorkoutLabel(it) },
-        onLoadUnitChange = { viewModel.setExerciseLoadUnit(exercise.id, it) },
+        onLoadUnitChange = {
+            viewModel.setExerciseLoadUnit(exercise.id, it)
+            // Without history the old number belongs to the other unit; start over at 0.
+            if (it != exercise.loadUnit && state.previousWorkSets.isEmpty()) weightInput = "0"
+        },
         onLogSet = {
             val weight = weightInput.toFloatOrNull()
             val reps = repsInput.toIntOrNull()

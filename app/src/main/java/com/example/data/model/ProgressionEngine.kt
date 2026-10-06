@@ -44,7 +44,7 @@ object ProgressionEngine {
 
         if (workSets.isEmpty()) {
             return ProgressionRecommendation(
-                suggestedWeightKg = 60f,
+                suggestedWeightKg = 0f,
                 suggestedRepsMin = repMin,
                 suggestedRepsMax = repMax,
                 targetRir = targetRir,
