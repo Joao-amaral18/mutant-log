@@ -231,7 +231,9 @@ data class WorkoutSession(
     val readinessNote: String = "",
     // Optional check-in extras: hours slept last night and stress 1-5; null when skipped.
     val sleepHours: Float? = null,
-    val stressScore: Int? = null
+    val stressScore: Int? = null,
+    // False when no check-in was taken (past and free workouts): the readiness fields above are placeholders then.
+    val readinessRecorded: Boolean = true
 )
 
 /** Joints offered by the readiness check-in. */
@@ -267,8 +269,9 @@ data class WorkoutExercise(
     val nextSetReps: Int? = null,
     val seatPosition: String = "",
     val handlePosition: String = "",
-    val executionQuality: String = "Good", // Excellent, Good, Compromised, Bad
-    val targetMuscleQuality: String = "Good", // Excellent, Good, Weak, None
+    // Empty until rated, so "not rated" stays distinct from "Good".
+    val executionQuality: String = "", // "", Excellent, Good, Compromised, Bad
+    val targetMuscleQuality: String = "", // "", Excellent, Good, Weak, None
     // Session plan copied from the program day; null falls back to the exercise defaults.
     val targetWorkSets: Int? = null,
     val targetRepMin: Int? = null,

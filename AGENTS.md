@@ -14,7 +14,7 @@ The app has one Gradle module, `app`, and one activity. `MainActivity.kt` owns e
 
 Use these source areas as the map:
 
-- `ui/screens`: product surfaces. `HomeScreen` manages protocols and workout entry; `ActiveWorkoutScreen` is the live session; `CompletedWorkoutEditor` edits recorded sessions; the remaining screens cover the exercise dossier, volume, and cardio.
+- `ui/screens`: product surfaces. `HomeScreen` manages protocols and workout entry; `ActiveWorkoutScreen` is the live session; `CompletedWorkoutEditor` edits recorded sessions; the remaining screens cover the exercise dossier and cardio.
 - `ui/components`: cross-screen dialogs, the persisted rest timer UI/alerts, plate visualization, and `WorkoutTimerService`.
 - `ui/designsystem`: canonical color, type, spacing, shape, motion tokens, and reusable `Mutant*` components.
 - `ui/theme`: the app theme entry point plus compatibility aliases used by older screen code.

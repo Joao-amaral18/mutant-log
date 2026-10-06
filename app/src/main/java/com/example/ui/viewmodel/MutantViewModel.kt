@@ -495,7 +495,7 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
     /** Opens a workout done earlier so it can be logged with the normal session screen; no rest timer runs. */
     fun startPastWorkout(programDay: ProgramDay, startedAt: Long, durationMinutes: Int, onStarted: () -> Unit = {}) {
         createWorkout(onStarted) { gymId ->
-            repository.startWorkoutSession(programDay, gymId, ReadinessInput(), startedAt, durationMinutes.coerceIn(1, 600))
+            repository.startWorkoutSession(programDay, gymId, readiness = null, startedAt = startedAt, retroactiveMinutes = durationMinutes.coerceIn(1, 600))
         }
     }
 
@@ -507,7 +507,7 @@ class MutantViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch { dao.setProgramScheduleMode(programId, mode) }
     }
 
-    fun startAdHocWorkout(title: String, exerciseIds: List<Long>, readiness: ReadinessInput, onStarted: () -> Unit = {}) {
+    fun startAdHocWorkout(title: String, exerciseIds: List<Long>, readiness: ReadinessInput?, onStarted: () -> Unit = {}) {
         createWorkout(onStarted) { gymId -> repository.startAdHocWorkoutSession(title, gymId, exerciseIds, readiness) }
     }
 

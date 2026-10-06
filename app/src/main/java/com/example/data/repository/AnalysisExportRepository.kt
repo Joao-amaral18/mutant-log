@@ -169,8 +169,9 @@ class AnalysisExportRepositoryImpl(
                             restSecondsMin = pEx?.restSeconds ?: ex?.defaultRestSeconds,
                             restSecondsMax = pEx?.restSeconds ?: ex?.defaultRestSeconds
                         ),
-                        executionQuality = we.executionQuality.lowercase().ifEmpty { "good" },
-                        targetMuscleQuality = we.targetMuscleQuality.lowercase().ifEmpty { "good" },
+                        // null when the exercise was never rated.
+                        executionQuality = we.executionQuality.lowercase().ifEmpty { null },
+                        targetMuscleQuality = we.targetMuscleQuality.lowercase().ifEmpty { null },
                         setup = SetupExport(
                             seat = we.seatPosition.ifEmpty { ex?.seatPosition?.ifEmpty { null } },
                             handle = we.handlePosition.ifEmpty { ex?.handlePosition?.ifEmpty { null } },
@@ -216,7 +217,7 @@ class AnalysisExportRepositoryImpl(
             )
         }
 
-        val readinessExport = workouts.filter { it.finishedAt != null }.map { session ->
+        val readinessExport = workouts.filter { it.finishedAt != null && it.readinessRecorded }.map { session ->
             ReadinessExport(
                 date = dateFormat.format(Date(session.startedAt)),
                 workoutId = "ws-${session.id}",
