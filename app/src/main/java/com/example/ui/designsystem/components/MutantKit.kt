@@ -12,6 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -20,18 +22,28 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -191,8 +203,11 @@ fun MutantStepper(
     allowDecimal: Boolean = true,
     enabled: Boolean = true,
     valueDescription: String = label,
-    buttonWidth: Dp = 48.dp
+    buttonWidth: Dp = 48.dp,
+    // Next moves to the following field, Done closes the keyboard.
+    imeAction: ImeAction = ImeAction.Done
 ) {
+    val focusManager = LocalFocusManager.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         MutantEyebrow(label, modifier = Modifier.padding(start = 4.dp))
         Row(
@@ -216,7 +231,11 @@ fun MutantStepper(
                 singleLine = true,
                 textStyle = MutantType.MonoValue.copy(color = MutantColors.TextPrimary, textAlign = TextAlign.Center),
                 cursorBrush = SolidColor(MutantColors.Primary),
-                keyboardOptions = KeyboardOptions(keyboardType = if (allowDecimal) KeyboardType.Decimal else KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = if (allowDecimal) KeyboardType.Decimal else KeyboardType.Number, imeAction = imeAction),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Next) },
+                    onDone = { focusManager.clearFocus() }
+                ),
                 modifier = Modifier
                     .weight(1f)
                     .semantics { contentDescription = valueDescription }
@@ -227,14 +246,52 @@ fun MutantStepper(
     }
 }
 
+/** Tap steps once; holding repeats and accelerates so a 20 kg change is not twenty taps. */
 @Composable
-private fun StepperButton(icon: ImageVector, description: String, onClick: () -> Unit, enabled: Boolean, tag: String, width: Dp) {
-    IconButton(
-        onClick = onClick, enabled = enabled,
-        modifier = Modifier.width(width).fillMaxHeight().testTag(tag),
-        colors = IconButtonDefaults.iconButtonColors(contentColor = MutantColors.TextSecondary, disabledContentColor = MutantColors.TextMetadata)
-    ) { Icon(icon, contentDescription = description, modifier = Modifier.size(22.dp)) }
+private fun StepperButton(icon: ImageVector, description: String, onStep: () -> Unit, enabled: Boolean, tag: String, width: Dp) {
+    val currentOnClick by rememberUpdatedState(onStep)
+    var repeated by remember { mutableStateOf(false) }
+    Box(
+        Modifier
+            .width(width)
+            .fillMaxHeight()
+            .testTag(tag)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = description
+                if (enabled) onClick(label = description) { currentOnClick(); true } else disabled()
+            }
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectTapGestures(
+                    onPress = {
+                        repeated = false
+                        coroutineScope {
+                            val job = launch {
+                                delay(HoldDelayMs)
+                                repeated = true
+                                var gap = 180L
+                                while (true) {
+                                    currentOnClick()
+                                    delay(gap)
+                                    gap = (gap * 0.85f).toLong().coerceAtLeast(45L)
+                                }
+                            }
+                            tryAwaitRelease()
+                            job.cancel()
+                        }
+                    },
+                    onTap = { if (!repeated) currentOnClick() }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp),
+            tint = if (enabled) MutantColors.TextSecondary else MutantColors.TextMetadata)
+    }
 }
+
+private const val HoldDelayMs = 400L
 
 /** Labelled text input in the sheet style: dark well, line border, eyebrow label. */
 @Composable

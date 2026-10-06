@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -106,7 +107,13 @@ private fun techniqueBadge(technique: IntensityTechnique): String? = when (techn
     IntensityTechnique.NONE -> null
 }
 
-private val SetColumns = listOf(36.dp, 0.dp, 64.dp, 48.dp, 40.dp, 28.dp)
+private val SetColumns = listOf(36.dp, 0.dp, 64.dp, 48.dp, 40.dp, 4.dp)
+
+private val techniqueLabels = listOf(
+    IntensityTechnique.DROP_SET to "Drop set",
+    IntensityTechnique.REST_PAUSE to "Rest-pause",
+    IntensityTechnique.PARTIAL_REPS to "Partials"
+)
 
 /** Presentation only: the screen coordinator keeps mutations and durable state in Room. */
 @Composable
@@ -209,7 +216,7 @@ fun ActiveWorkoutContent(
                 ) {
                     Surface(
                         onClick = onOpenList,
-                        modifier = Modifier.height(36.dp).testTag("view_all_exercises"),
+                        modifier = Modifier.height(44.dp).testTag("view_all_exercises"),
                         shape = RoundedCornerShape(18.dp),
                         color = MutantColors.SurfaceContainerHigh,
                         border = BorderStroke(1.dp, MutantColors.Outline)
@@ -241,7 +248,24 @@ fun ActiveWorkoutContent(
                 }
             }
         },
-        bottomBar = restTimer
+        bottomBar = {
+            Column {
+                // Pinned so logging a set never needs a scroll, whatever the number of planned sets.
+                if (showLogger) {
+                    Box(Modifier.fillMaxWidth().background(MutantColors.Background).padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 8.dp)) {
+                        SetLogger(
+                            exercise = exercise, plannedSets = detail.plannedSets, workSetCount = workSets.size,
+                            weightValue = weightValue, repsValue = repsValue, setType = setType, rir = rir,
+                            technique = technique, segments = segments, enabled = enabled,
+                            onWeightChange = onWeightChange, onRepsChange = onRepsChange,
+                            onSetTypeChange = onSetTypeChange, onRirChange = onRirChange,
+                            onTechniqueChange = onTechniqueChange, onEditSegments = onEditSegments, onLogSet = onLogSet
+                        )
+                    }
+                }
+                restTimer()
+            }
+        }
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).testTag("active_workout_content"),
@@ -258,7 +282,7 @@ fun ActiveWorkoutContent(
                     Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (adHoc) {
                             Text("Added today · no plan", style = MutantType.Chip, color = MutantColors.Primary,
-                                modifier = Modifier.height(26.dp).background(MutantColors.PrimarySelected, RoundedCornerShape(8.dp))
+                                modifier = Modifier.height(32.dp).background(MutantColors.PrimarySelected, RoundedCornerShape(8.dp))
                                     .wrapContentHeight().padding(horizontal = 10.dp).testTag("ad_hoc_chip"))
                         } else {
                             SpecChip("${detail.plannedSets} × ${detail.repMin}–${detail.repMax}")
@@ -285,9 +309,9 @@ fun ActiveWorkoutContent(
                                 target?.let { "${loadText(it.first, exercise.usesStack)} × ${it.second}" } ?: if (adHoc) "Log as you go" else "Set a baseline",
                                 style = MutantType.MonoValue, color = MutantColors.TextPrimary
                             )
-                            Text(
-                                if (state.previousWorkSets.isEmpty()) "First time on this exercise"
-                                else "Last time: " + state.previousWorkSets.joinToString(" · ") { "${loadLabel(it.weightKg)}×${it.reps}" },
+                            // The LAST column of the set table already lists last session's sets.
+                            if (state.previousWorkSets.isEmpty()) Text(
+                                "First time on this exercise",
                                 style = MutantType.Caption.copy(lineHeight = 16.sp), color = MutantColors.TextSecondary
                             )
                         }
@@ -318,16 +342,6 @@ fun ActiveWorkoutContent(
                 )
             }
             if (showLogger) {
-                item(key = "logger") {
-                    SetLogger(
-                        exercise = exercise, plannedSets = detail.plannedSets, workSetCount = workSets.size,
-                        weightValue = weightValue, repsValue = repsValue, setType = setType, rir = rir,
-                        technique = technique, segments = segments, enabled = enabled,
-                        onWeightChange = onWeightChange, onRepsChange = onRepsChange,
-                        onSetTypeChange = onSetTypeChange, onRirChange = onRirChange,
-                        onTechniqueChange = onTechniqueChange, onEditSegments = onEditSegments, onLogSet = onLogSet
-                    )
-                }
                 if (adHoc && workSets.isNotEmpty()) {
                     item(key = "ad_hoc_done") {
                         MutantButton("Done · $nextLabel", onClick = onNext, enabled = enabled, style = MutantButtonStyle.Outline,
@@ -389,7 +403,7 @@ private fun UpNextCard(next: WorkoutExerciseDetail, progression: ProgressionReco
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             stats.forEach { (label, value) ->
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    MutantEyebrow(label, style = MutantType.Eyebrow.copy(fontSize = 9.5.sp))
+                    MutantEyebrow(label, style = MutantType.Eyebrow.copy(fontSize = 11.sp))
                     Text(value, style = MutantType.MonoBody.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
                         color = MutantColors.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
@@ -407,8 +421,8 @@ private fun ExercisePill(number: Int, label: String, current: Boolean, finished:
                          onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick, enabled = enabled,
-        modifier = modifier.height(36.dp),
-        shape = RoundedCornerShape(18.dp),
+        modifier = modifier.height(44.dp),
+        shape = RoundedCornerShape(22.dp),
         color = if (current) MutantColors.PrimarySelected else MutantColors.SurfaceContainer,
         border = BorderStroke(1.dp, if (current) MutantColors.Primary else MutantColors.OutlineVariant)
     ) {
@@ -440,7 +454,7 @@ private fun ExercisePill(number: Int, label: String, current: Boolean, finished:
 @Composable
 private fun SpecChip(text: String, withTimer: Boolean = false) {
     Row(
-        Modifier.height(26.dp).background(MutantColors.SurfaceContainerHigh, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp),
+        Modifier.height(32.dp).background(MutantColors.SurfaceContainerHigh, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -550,7 +564,7 @@ private fun SetTable(
     Column(Modifier.fillMaxWidth().testTag("set_table"), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         SetGridRow(Modifier.padding(start = 4.dp, end = 4.dp, bottom = 6.dp)) { col ->
             val header = listOf("SET", "LAST", if (stack) "PIN" else "KG", "REPS", "RIR", "")[col]
-            if (header.isNotEmpty()) MutantEyebrow(header, style = MutantType.Eyebrow.copy(fontSize = 9.5.sp))
+            if (header.isNotEmpty()) MutantEyebrow(header, style = MutantType.Eyebrow.copy(fontSize = 11.sp))
         }
         warmups.forEach { set ->
             val remove = { onRemoveSet(set.id) }.takeIf { enabled }
@@ -558,7 +572,7 @@ private fun SetTable(
                 SetLine(label = "A", labelColor = MutantColors.TextSecondary, labelBackground = MutantColors.SurfaceContainerHigh,
                     previous = "—", kg = loadLabel(set.weightKg), reps = "${set.reps}", rir = "—",
                     textColor = MutantColors.TextSecondary, background = MutantColors.Background,
-                    badge = null, onDelete = remove, tag = "set_row_${set.id}")
+                    badge = null, tag = "set_row_${set.id}")
             }
         }
         val rows = when {
@@ -579,8 +593,7 @@ private fun SetTable(
                             badge = when {
                                 set.isPr -> Triple("PR", MutantColors.Warning.copy(alpha = 0.16f), MutantColors.Warning)
                                 else -> techniqueBadge(set.technique)?.let { Triple(it, MutantColors.Line, MutantColors.TextSecondary) }
-                            },
-                            onDelete = remove, tag = "set_row_${set.id}"
+                            }, tag = "set_row_${set.id}"
                         )
                     }
                 }
@@ -590,7 +603,7 @@ private fun SetTable(
                         previous = prev, kg = draftWeight.toFloatOrNull()?.let(::loadLabel) ?: draftWeight.ifBlank { "—" }, reps = draftReps.ifBlank { "—" },
                         rir = if (draftRir >= 4) "4+" else "$draftRir",
                         textColor = MutantColors.TextPrimary, background = MutantColors.PrimaryRow,
-                        badge = null, onDelete = null, tag = "set_row_current"
+                        badge = null, tag = "set_row_current"
                     )
                 }
                 else -> Removable("set_row_pending_$index", onRemovePlannedSet.takeIf { canTrim }) {
@@ -602,7 +615,7 @@ private fun SetTable(
                         reps = targets.getOrNull(index)?.second?.toString() ?: "—",
                         rir = "—",
                         textColor = MutantColors.TextMetadata, background = MutantColors.Background,
-                        badge = null, onDelete = null, tag = "set_row_pending_$index"
+                        badge = null, tag = "set_row_pending_$index"
                     )
                 }
             }
@@ -613,19 +626,17 @@ private fun SetTable(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (adHoc) {
-                Text("Log as many sets as you need", style = MutantType.Caption.copy(fontSize = 11.sp), color = MutantColors.TextMetadata,
+                Text("Log as many sets as you need", style = MutantType.Caption.copy(fontSize = 12.sp), color = MutantColors.TextMetadata,
                     modifier = Modifier.weight(1f))
             } else {
                 TextButton(onClick = onAddSet, enabled = enabled, contentPadding = PaddingValues(start = 0.dp, end = 10.dp),
-                    modifier = Modifier.height(40.dp).testTag("add_set")) {
+                    modifier = Modifier.height(48.dp).testTag("add_set")) {
                     Icon(Icons.Rounded.Add, contentDescription = null, tint = MutantColors.Primary, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Add set", style = MutantType.ButtonSmall.copy(fontWeight = FontWeight.SemiBold), color = MutantColors.Primary)
                 }
                 Spacer(Modifier.weight(1f))
             }
-            Text("Swipe a set left to remove", style = MutantType.Caption.copy(fontSize = 11.sp), color = MutantColors.TextMetadata,
-                textAlign = TextAlign.End)
         }
     }
 }
@@ -650,25 +661,24 @@ private fun SetLine(
     previous: String, kg: String, reps: String, rir: String,
     textColor: Color, background: Color,
     badge: Triple<String, Color, Color>?,
-    onDelete: (() -> Unit)?,
     tag: String
 ) {
     val value = MutantType.MonoBody.copy(textAlign = TextAlign.End)
     SetGridRow(
         Modifier
-            .heightIn(min = 44.dp)
+            .heightIn(min = 48.dp)
             .background(background, RoundedCornerShape(12.dp))
             .padding(horizontal = 4.dp)
             .testTag(tag)
     ) { col ->
         when (col) {
-            0 -> Box(Modifier.size(26.dp).background(labelBackground, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+            0 -> Box(Modifier.size(32.dp).background(labelBackground, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                 Text(label, style = MutantType.MonoLabel.copy(fontWeight = FontWeight.Bold), color = labelColor)
             }
             1 -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(previous, style = MutantType.MonoBody.copy(fontSize = 12.sp), color = MutantColors.TextMetadata, maxLines = 1)
                 if (badge != null) {
-                    Text(badge.first, style = MutantType.MonoLabel.copy(fontSize = 9.sp, lineHeight = 9.sp, fontWeight = FontWeight.Bold),
+                    Text(badge.first, style = MutantType.MonoLabel.copy(fontSize = 11.sp, lineHeight = 11.sp, fontWeight = FontWeight.Bold),
                         color = badge.third,
                         modifier = Modifier.background(badge.second, RoundedCornerShape(5.dp)).padding(horizontal = 5.dp, vertical = 3.dp))
                 }
@@ -676,11 +686,7 @@ private fun SetLine(
             2 -> Text(kg, style = value, color = textColor, maxLines = 1)
             3 -> Text(reps, style = value, color = textColor, maxLines = 1)
             4 -> Text(rir, style = value, color = textColor, maxLines = 1)
-            else -> if (onDelete != null) {
-                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp).testTag("delete_$tag")) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Remove set", tint = MutantColors.TextMetadata, modifier = Modifier.size(16.dp))
-                }
-            }
+            else -> Unit
         }
     }
 }
@@ -711,33 +717,48 @@ private fun SetLogger(
     val stack = exercise.usesStack
     val step = if (stack) 1f else exercise.defaultIncrementKg.takeIf { it.isFinite() && it > 0f } ?: 2.5f
     val warmup = setType == SetType.WARMUP
+    var techniqueOpen by remember { mutableStateOf(false) }
     Column(
         Modifier
             .fillMaxWidth()
             .background(MutantColors.SurfaceContainer, RoundedCornerShape(22.dp))
             .border(1.dp, MutantColors.OutlineVariant, RoundedCornerShape(22.dp))
-            .padding(14.dp)
+            .padding(12.dp)
             .testTag("set_logger_card"),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            val pickTechnique: (IntensityTechnique) -> Unit = {
-                if (warmup) onSetTypeChange(SetType.WORK)
-                onTechniqueChange(it)
-            }
-            MutantChoiceChip("Straight", !warmup && technique == IntensityTechnique.NONE, { pickTechnique(IntensityTechnique.NONE) },
-                enabled = enabled, modifier = Modifier.testTag("technique_NONE"))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             MutantChoiceChip("Warm-up", warmup, {
-                if (technique != IntensityTechnique.NONE) onTechniqueChange(IntensityTechnique.NONE)
-                onSetTypeChange(SetType.WARMUP)
+                if (warmup) onSetTypeChange(SetType.WORK)
+                else {
+                    if (technique != IntensityTechnique.NONE) onTechniqueChange(IntensityTechnique.NONE)
+                    onSetTypeChange(SetType.WARMUP)
+                }
             }, enabled = enabled, modifier = Modifier.testTag("set_type_WARMUP"))
-            listOf(
-                IntensityTechnique.DROP_SET to "Drop set",
-                IntensityTechnique.REST_PAUSE to "Rest-pause",
-                IntensityTechnique.PARTIAL_REPS to "Partials"
-            ).forEach { (option, label) ->
-                MutantChoiceChip(label, !warmup && technique == option, { pickTechnique(option) },
-                    enabled = enabled, modifier = Modifier.testTag("technique_${option.name}"))
+            val techniqueName = techniqueLabels.firstOrNull { it.first == technique && !warmup && technique != IntensityTechnique.NONE }?.second
+            MutantChoiceChip(techniqueName ?: "Technique", techniqueOpen || techniqueName != null, { techniqueOpen = !techniqueOpen },
+                enabled = enabled, modifier = Modifier.testTag("technique_toggle"))
+            Spacer(Modifier.weight(1f))
+            if (!valid) {
+                Text("Load ≥ 0 and reps ≥ 1", style = MutantType.Caption, color = MutantColors.Error,
+                    modifier = Modifier.testTag("set_input_error"))
+            } else if (!stack && !warmup) {
+                Text(platesPerSide(weight ?: 0f), style = MutantType.MonoLabel.copy(fontWeight = FontWeight.Normal, fontSize = 11.sp),
+                    color = MutantColors.TextMetadata, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(3f), textAlign = TextAlign.End)
+            }
+        }
+        if (techniqueOpen) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val pickTechnique: (IntensityTechnique) -> Unit = {
+                    if (warmup) onSetTypeChange(SetType.WORK)
+                    onTechniqueChange(it)
+                }
+                MutantChoiceChip("Straight", !warmup && technique == IntensityTechnique.NONE, { pickTechnique(IntensityTechnique.NONE) },
+                    enabled = enabled, modifier = Modifier.testTag("technique_NONE"))
+                techniqueLabels.forEach { (option, label) ->
+                    MutantChoiceChip(label, !warmup && technique == option, { pickTechnique(option) },
+                        enabled = enabled, modifier = Modifier.testTag("technique_${option.name}"))
+                }
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -745,7 +766,7 @@ private fun SetLogger(
                 label = if (stack) "LOAD · STACK PIN" else "LOAD · KG", value = weightValue, onValueChange = onWeightChange,
                 onMinus = { onWeightChange(loadLabel(((weight ?: 0f) - step).coerceAtLeast(0f))) },
                 onPlus = { onWeightChange(loadLabel((weight ?: 0f) + step)) },
-                tag = "weight", valueDescription = if (stack) "Load as stack pin position" else "Load in kilograms", enabled = enabled,
+                tag = "weight", imeAction = ImeAction.Next, valueDescription = if (stack) "Load as stack pin position" else "Load in kilograms", enabled = enabled,
                 modifier = Modifier.weight(1f)
             )
             MutantStepper(
@@ -756,20 +777,18 @@ private fun SetLogger(
                 modifier = Modifier.weight(1f)
             )
         }
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            MutantEyebrow("RIR · REPS IN RESERVE", modifier = Modifier.padding(start = 4.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                (0..4).forEach { option ->
-                    MutantChoiceChip(
-                        label = if (option == 4) "4+" else "$option",
-                        selected = if (option == 4) rir >= 4 else rir == option,
-                        onClick = { onRirChange(option) },
-                        enabled = enabled && !warmup,
-                        modifier = Modifier.weight(1f).testTag("rir_option_$option"),
-                        height = 44.dp, cornerRadius = 12.dp, horizontalPadding = 0.dp,
-                        textStyle = MutantType.MonoBody.copy(fontWeight = FontWeight.Bold)
-                    )
-                }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            MutantEyebrow("RIR", modifier = Modifier.padding(start = 4.dp, end = 4.dp), style = MutantType.Eyebrow.copy(fontSize = 11.sp))
+            (0..4).forEach { option ->
+                MutantChoiceChip(
+                    label = if (option == 4) "4+" else "$option",
+                    selected = if (option == 4) rir >= 4 else rir == option,
+                    onClick = { onRirChange(option) },
+                    enabled = enabled && !warmup,
+                    modifier = Modifier.weight(1f).testTag("rir_option_$option"),
+                    height = 44.dp, cornerRadius = 12.dp, horizontalPadding = 0.dp,
+                    textStyle = MutantType.MonoBody.copy(fontWeight = FontWeight.Bold)
+                )
             }
         }
         if (technique == IntensityTechnique.REST_PAUSE || technique == IntensityTechnique.DROP_SET) {
@@ -789,12 +808,5 @@ private fun SetLogger(
             onClick = onLogSet, enabled = enabled && valid, icon = Icons.Rounded.Check,
             modifier = Modifier.fillMaxWidth().testTag("log_set_button")
         )
-        if (!valid) {
-            Text("Enter a load of 0 kg or more and at least 1 rep.", style = MutantType.Caption, color = MutantColors.Error,
-                modifier = Modifier.testTag("set_input_error"))
-        } else {
-            Text(if (stack) "Stack position, not kg" else platesPerSide(weight ?: 0f), style = MutantType.MonoLabel.copy(fontWeight = FontWeight.Normal),
-                color = MutantColors.TextMetadata, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        }
     }
 }
