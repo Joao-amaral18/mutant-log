@@ -102,8 +102,8 @@ fun legacyToBackup(export: AnalysisExport, databaseVersion: Int): BackupExport {
                 id = weId, workoutSessionId = sessionId, exerciseId = exerciseId, orderIndex = we.position,
                 notes = we.setup?.notes.orEmpty(),
                 seatPosition = we.setup?.seat.orEmpty(), handlePosition = we.setup?.handle.orEmpty(),
-                executionQuality = first?.executionQuality?.capitalized() ?: "Good",
-                targetMuscleQuality = first?.targetMuscleQuality?.capitalized() ?: "Good",
+                executionQuality = (we.executionQuality ?: first?.executionQuality)?.capitalized() ?: "Good",
+                targetMuscleQuality = (we.targetMuscleQuality ?: first?.targetMuscleQuality)?.capitalized() ?: "Good",
                 targetWorkSets = we.target?.workSets?.coerceAtLeast(1),
                 targetRepMin = we.target?.repMin, targetRepMax = we.target?.repMax,
                 targetRir = we.target?.rirMax?.toInt(), restSeconds = we.target?.restSecondsMin

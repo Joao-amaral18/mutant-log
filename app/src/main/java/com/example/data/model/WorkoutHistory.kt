@@ -14,6 +14,8 @@ data class HistoryExercise(val workoutExercise: WorkoutExercise, val exercise: E
     val workSets by once { sets.filter { it.set.setType == SetType.WORK } }
     // Stack-pin loads are positions, not kilograms: they would distort kg volume, so they count as zero.
     val volume by once { if (exercise.usesStack) 0.0 else workSets.sumOf { it.volume } }
+    // Stack-pin work in pin x reps: not comparable with kg, but it keeps machine sessions from reading as zero volume.
+    val pinVolume by once { if (exercise.usesStack) workSets.sumOf { it.volume } else 0.0 }
     val reps by once { workSets.sumOf { it.reps } }
     val bestSet by once { workSets.maxWithOrNull(compareBy<HistorySet> { it.set.weightKg }.thenBy { it.set.reps })?.set }
     val e1rm by once { workSets.maxOfOrNull { it.set.weightKg.toDouble() * (1 + it.set.reps / 30.0) } ?: 0.0 }
@@ -22,6 +24,7 @@ data class HistoryExercise(val workoutExercise: WorkoutExercise, val exercise: E
 data class HistoryWorkout(val session: WorkoutSession, val exercises: List<HistoryExercise>, val cardio: List<CardioSession> = emptyList()) {
     val sets by once { exercises.flatMap { it.workSets } }
     val volume by once { exercises.sumOf { it.volume } }
+    val pinVolume by once { exercises.sumOf { it.pinVolume } }
     val reps by once { exercises.sumOf { it.reps } }
     val prs by once { sets.count { it.set.isPr } }
     val minutes get() = ((requireNotNull(session.finishedAt) - session.startedAt).coerceAtLeast(0) / 60_000).toInt()
@@ -52,6 +55,7 @@ private val RecentFirst = compareByDescending<HistoryWorkout> { it.session.start
 data class ExercisePerformance(val workout: HistoryWorkout, val entries: List<HistoryExercise>) {
     val sets get() = entries.flatMap { it.workSets }
     val volume get() = entries.sumOf { it.volume }
+    val pinVolume get() = entries.sumOf { it.pinVolume }
     val reps get() = entries.sumOf { it.reps }
     val e1rm get() = entries.maxOfOrNull { it.e1rm } ?: 0.0
     val bestSet get() = sets.maxWithOrNull(compareBy<HistorySet> { it.set.weightKg }.thenBy { it.set.reps })?.set
