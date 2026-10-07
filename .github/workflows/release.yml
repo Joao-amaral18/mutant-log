@@ -6,7 +6,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   release:
@@ -48,6 +48,17 @@ jobs:
       - name: Remove keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/upload-key.jks"
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            gh release create "$GITHUB_REF_NAME" --title "Mutant Log $GITHUB_REF_NAME" --generate-notes \
+              app/build/outputs/apk/release/*.apk
+          else
+            gh release create "build-${GITHUB_RUN_NUMBER}" --target "$GITHUB_SHA" --title "Mutant Log build ${GITHUB_RUN_NUMBER}" --generate-notes \
+              app/build/outputs/apk/release/*.apk
+          fi
       - uses: actions/upload-artifact@v5
         with:
           name: app-release
