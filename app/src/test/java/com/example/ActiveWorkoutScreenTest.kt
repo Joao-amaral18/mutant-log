@@ -98,11 +98,12 @@ class ActiveWorkoutScreenTest {
     @Test fun `normal phone logs the selected metrics and preserves workout actions`() {
         render()
         capture("normal-top")
-        compose.onNodeWithTag("weight_plus_button").performScrollTo().performClick()
-        compose.onNodeWithTag("reps_minus_button").performScrollTo().performClick()
-        compose.onNodeWithTag("rir_option_2").performScrollTo().performClick().assertIsSelected()
-        compose.onNodeWithTag("technique_PARTIAL_REPS").performScrollTo().performClick().assertIsSelected()
-        compose.onNodeWithTag("log_set_button").performScrollTo().performClick()
+        compose.onNodeWithTag("weight_plus_button").performClick()
+        compose.onNodeWithTag("reps_minus_button").performClick()
+        compose.onNodeWithTag("rir_option_2").performClick().assertIsSelected()
+        compose.onNodeWithTag("technique_toggle").performClick()
+        compose.onNodeWithTag("technique_PARTIAL_REPS").performClick().assertIsSelected()
+        compose.onNodeWithTag("log_set_button").performClick()
         assertEquals(listOf(LoggedSet(SetType.WORK, 62.5f, 9, 2, IntensityTechnique.PARTIAL_REPS)), logged)
         capture("normal-logger")
         compose.onNodeWithTag("exercise_progress_1").performClick()
@@ -131,7 +132,8 @@ class ActiveWorkoutScreenTest {
         compose.onNodeWithTag("set_row_1").performTouchInput { swipeLeft(startX = right - 4f, endX = left, durationMillis = 300) }
         compose.waitForIdle()
         assertEquals(listOf(1L), removedSets)
-        compose.onNodeWithTag("delete_set_row_2").performClick()
+        compose.onNodeWithTag("set_row_2").performTouchInput { swipeLeft(startX = right - 4f, endX = left, durationMillis = 300) }
+        compose.waitForIdle()
         assertEquals(listOf(1L, 2L), removedSets)
         // Two planned sets, both logged: nothing left to trim.
         compose.onNodeWithTag("set_row_pending_1").assertDoesNotExist()
@@ -144,7 +146,6 @@ class ActiveWorkoutScreenTest {
         compose.waitForIdle()
         assertEquals(1, plannedRemovals)
         compose.onNodeWithText("LAST").assertExists()
-        compose.onNodeWithText("Swipe a set left to remove").assertExists()
     }
 
     @Test fun `exercise added today has no plan and logs open-ended sets`() {
@@ -153,7 +154,7 @@ class ActiveWorkoutScreenTest {
         compose.onNodeWithText("Log as you go").assertExists()
         compose.onNodeWithTag("add_set").assertDoesNotExist()
         compose.onNodeWithText("Log as many sets as you need").assertExists()
-        compose.onNodeWithTag("log_set_button").performScrollTo().assertTextContains("Log set 1", substring = true)
+        compose.onNodeWithTag("log_set_button").assertTextContains("Log set 1", substring = true)
         compose.onNodeWithTag("ad_hoc_next").assertDoesNotExist()
         capture("normal-adhoc")
     }
@@ -174,7 +175,7 @@ class ActiveWorkoutScreenTest {
                 )
             }
         }
-        compose.onNodeWithTag("log_set_button").performScrollTo().assertTextContains("Log set 2", substring = true)
+        compose.onNodeWithTag("log_set_button").assertTextContains("Log set 2", substring = true)
         // Lazy items below the fold are not composed until scrolled to.
         compose.onNodeWithTag("active_workout_content").performScrollToNode(hasTestTag("ad_hoc_next"))
         compose.onNodeWithTag("ad_hoc_next").assertTextContains("Done · Next: Barbell Curl", substring = true).performClick()
@@ -188,28 +189,29 @@ class ActiveWorkoutScreenTest {
     fun `compact phone handles warmups segments and invalid input without hidden actions`() {
         render(longTitle = true)
         capture("compact-top")
-        compose.onNodeWithTag("set_type_WARMUP").performScrollTo().performClick().assertIsSelected()
-        compose.onNodeWithTag("weight_input").performScrollTo().performTextReplacement("0")
-        compose.onNodeWithTag("weight_minus_button").performScrollTo().performClick()
+        compose.onNodeWithTag("set_type_WARMUP").performClick().assertIsSelected()
+        compose.onNodeWithTag("weight_input").performTextReplacement("0")
+        compose.onNodeWithTag("weight_minus_button").performClick()
         compose.onNodeWithTag("weight_input").assertTextEquals("0")
-        compose.onNodeWithTag("reps_input").performScrollTo().performTextReplacement("1")
-        compose.onNodeWithTag("reps_minus_button").performScrollTo().performClick()
+        compose.onNodeWithTag("reps_input").performTextReplacement("1")
+        compose.onNodeWithTag("reps_minus_button").performClick()
         compose.onNodeWithTag("reps_input").assertTextEquals("1")
-        compose.onNodeWithTag("technique_DROP_SET").performScrollTo().performClick().assertIsSelected()
+        compose.onNodeWithTag("technique_toggle").performClick()
+        compose.onNodeWithTag("technique_DROP_SET").performClick().assertIsSelected()
         compose.onNodeWithTag("set_type_WARMUP").assertIsNotSelected()
-        compose.onNodeWithTag("edit_set_segments").performScrollTo().performClick()
+        compose.onNodeWithTag("edit_set_segments").performClick()
         assertEquals(1, segmentEdits)
-        compose.onNodeWithTag("set_type_WARMUP").performScrollTo().performClick().assertIsSelected()
-        compose.onNodeWithTag("log_set_button").performScrollTo().performClick()
+        compose.onNodeWithTag("set_type_WARMUP").performClick().assertIsSelected()
+        compose.onNodeWithTag("log_set_button").performClick()
         assertEquals(SetType.WARMUP, logged.single().type)
         assertEquals(IntensityTechnique.NONE, logged.single().technique)
         capture("compact-logger")
-        compose.onNodeWithTag("weight_input").performScrollTo().performTextClearance()
-        compose.onNodeWithTag("log_set_button").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("weight_input").performTextClearance()
+        compose.onNodeWithTag("log_set_button").assertIsNotEnabled()
         compose.onNodeWithTag("set_input_error").assertExists()
-        compose.onNodeWithTag("weight_input").performScrollTo().performTextReplacement("42,5")
+        compose.onNodeWithTag("weight_input").performTextReplacement("42,5")
         compose.onNodeWithTag("weight_input").assertTextEquals("42.5")
-        compose.onNodeWithTag("log_set_button").performScrollTo().assertIsEnabled()
+        compose.onNodeWithTag("log_set_button").assertIsEnabled()
         compose.onNodeWithTag("finish_workout").assertIsDisplayed()
         capture("compact-queue")
     }
@@ -217,9 +219,9 @@ class ActiveWorkoutScreenTest {
     @Test fun `workout mutations are disabled during completion or discard`() {
         render(enabled = false)
         compose.onNodeWithTag("finish_workout").assertIsNotEnabled()
-        compose.onNodeWithTag("weight_plus_button").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithTag("rir_option_0").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithTag("log_set_button").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("weight_plus_button").assertIsNotEnabled()
+        compose.onNodeWithTag("rir_option_0").assertIsNotEnabled()
+        compose.onNodeWithTag("log_set_button").assertIsNotEnabled()
         compose.onNodeWithTag("exercise_progress_1").assertIsNotEnabled()
     }
 }
