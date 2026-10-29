@@ -161,7 +161,24 @@ fun ActiveWorkoutScreen(
             ?: progression?.suggestedRepsMin ?: currentExDetail.repMin
         mutableStateOf(initialReps.toString())
     }
-    LaunchedEffect(workoutExercise.id, weightInput, repsInput) {
+    // Work load/reps parked while a warm-up or preparatory set borrows the inputs, so the next-set plan never saves them.
+    var stashedWork by remember(workoutExercise.id) { mutableStateOf<Pair<String, String>?>(null) }
+    var prepActive by remember(workoutExercise.id) { mutableStateOf(false) }
+    var prepIndex by remember(workoutExercise.id) { mutableIntStateOf(0) }
+    val loadStep = exercise.defaultIncrementKg
+    val restoreWork = {
+        stashedWork?.let { weightInput = it.first; repsInput = it.second }
+        stashedWork = null
+        prepActive = false
+    }
+    val fillAuto: (Float?, Int) -> Unit = { kg, reps ->
+        if (stashedWork == null) stashedWork = weightInput to repsInput
+        if (kg != null) weightInput = loadLabel(kg)
+        repsInput = reps.toString()
+    }
+    val workKg = (stashedWork?.first ?: weightInput).toFloatOrNull()?.takeIf { it.isFinite() && it > 0f }
+    LaunchedEffect(workoutExercise.id, weightInput, repsInput, selectedSetType) {
+        if (selectedSetType != SetType.WORK) return@LaunchedEffect
         // Wait for the target before persisting, or the placeholder would override it.
         if (progression == null && workoutExercise.nextSetWeightKg == null) return@LaunchedEffect
         val weight = weightInput.toFloatOrNull()
@@ -363,7 +380,22 @@ fun ActiveWorkoutScreen(
         onTarget = { sheet = SessionSheet.PROGRESSION },
         onWeightChange = { weightInput = it },
         onRepsChange = { repsInput = it },
-        onSetTypeChange = { selectedSetType = it },
+        onSetTypeChange = {
+            if (it == SetType.WARMUP) {
+                prepActive = false
+                fillAuto(workKg?.let { w -> WarmupPlan.warmupLoad(w, loadStep, exercise.usesStack) }, WarmupPlan.WARMUP_REPS)
+            } else restoreWork()
+            selectedSetType = it
+        },
+        prepLabel = "Prep ${prepIndex + 1}/${WarmupPlan.PREPS.size}",
+        prepSelected = selectedSetType == SetType.WARMUP && prepActive,
+        onPrep = {
+            val prep = WarmupPlan.PREPS[prepIndex]
+            if (selectedTechnique != IntensityTechnique.NONE) { attachedSegments = emptyList(); selectedTechnique = IntensityTechnique.NONE }
+            fillAuto(workKg?.let { w -> WarmupPlan.prepLoad(w, prepIndex, loadStep, exercise.usesStack) }, prep.reps)
+            prepActive = true
+            selectedSetType = SetType.WARMUP
+        },
         onRirChange = { selectedRir = it },
         onTechniqueChange = {
             if (selectedTechnique != it) attachedSegments = emptyList()
@@ -398,13 +430,15 @@ fun ActiveWorkoutScreen(
                     workoutExerciseId = workoutExercise.id,
                     type = selectedSetType, weightKg = weight, reps = reps, rir = selectedRir,
                     technique = selectedTechnique, segments = attachedSegments,
-                    defaultRestSeconds = if (selectedSetType == SetType.WARMUP) 60 else currentExDetail.plannedRestSeconds,
+                    defaultRestSeconds = if (prepActive) WarmupPlan.PREP_REST_SECONDS else if (selectedSetType == SetType.WARMUP) 60 else currentExDetail.plannedRestSeconds,
                     muscleGroup = exercise.muscleGroup
                 )
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 focusManager.clearFocus()
                 attachedSegments = emptyList()
                 selectedTechnique = IntensityTechnique.NONE
+                if (prepActive) prepIndex = (prepIndex + 1) % WarmupPlan.PREPS.size
+                restoreWork()
                 selectedSetType = SetType.WORK
                 isLogButtonPressed = true
                 coroutineScope.launch {
