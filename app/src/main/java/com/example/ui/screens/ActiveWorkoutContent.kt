@@ -150,6 +150,9 @@ fun ActiveWorkoutContent(
     // Shown instead of the running clock for a workout logged after the fact.
     pastWorkoutLabel: String? = null,
     onLoadUnitChange: (String) -> Unit = {},
+    prepLabel: String = "Prep",
+    prepSelected: Boolean = false,
+    onPrep: () -> Unit = {},
     setupEditor: @Composable () -> Unit = {},
     restTimer: @Composable () -> Unit = {}
 ) {
@@ -259,7 +262,8 @@ fun ActiveWorkoutContent(
                             technique = technique, segments = segments, enabled = enabled,
                             onWeightChange = onWeightChange, onRepsChange = onRepsChange,
                             onSetTypeChange = onSetTypeChange, onRirChange = onRirChange,
-                            onTechniqueChange = onTechniqueChange, onEditSegments = onEditSegments, onLogSet = onLogSet
+                            onTechniqueChange = onTechniqueChange, onEditSegments = onEditSegments, onLogSet = onLogSet,
+                            prepLabel = prepLabel, prepSelected = prepSelected, onPrep = onPrep
                         )
                     }
                 }
@@ -709,7 +713,10 @@ private fun SetLogger(
     onRirChange: (Int) -> Unit,
     onTechniqueChange: (IntensityTechnique) -> Unit,
     onEditSegments: () -> Unit,
-    onLogSet: () -> Unit
+    onLogSet: () -> Unit,
+    prepLabel: String,
+    prepSelected: Boolean,
+    onPrep: () -> Unit
 ) {
     val weight = weightValue.toFloatOrNull()
     val reps = repsValue.toIntOrNull()
@@ -728,13 +735,14 @@ private fun SetLogger(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            MutantChoiceChip("Warm-up", warmup, {
+            MutantChoiceChip("Warm-up", warmup && !prepSelected, {
                 if (warmup) onSetTypeChange(SetType.WORK)
                 else {
                     if (technique != IntensityTechnique.NONE) onTechniqueChange(IntensityTechnique.NONE)
                     onSetTypeChange(SetType.WARMUP)
                 }
             }, enabled = enabled, modifier = Modifier.testTag("set_type_WARMUP"))
+            MutantChoiceChip(prepLabel, prepSelected, onPrep, enabled = enabled, modifier = Modifier.testTag("set_type_PREP"))
             val techniqueName = techniqueLabels.firstOrNull { it.first == technique && !warmup && technique != IntensityTechnique.NONE }?.second
             MutantChoiceChip(techniqueName ?: "Technique", techniqueOpen || techniqueName != null, { techniqueOpen = !techniqueOpen },
                 enabled = enabled, modifier = Modifier.testTag("technique_toggle"))
